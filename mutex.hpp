@@ -16,6 +16,7 @@ public:
             std::this_thread::yield();
     }
 
+    [[nodiscard]]
     bool try_lock()  {
         if (flag_.test_and_set(std::memory_order_acquire))
             return false;
@@ -38,6 +39,7 @@ public:
                 event_.wait();
     }
 
+    [[nodiscard]]
     bool try_lock() {
         unsigned int expected = 0;
         if (state_.compare_exchange_weak(expected, 1, std::memory_order_acquire))
@@ -58,46 +60,43 @@ private:
 class fast_shared_mutex {
 public:	
     void lock_shared() {
-        if (count_.fetch_sub(1, std::memory_order_acquire) < 1)
-            rdwset_.wait();
+        if (rdcount_.fetch_add(-1, std::memory_order_acquire) < 1)
+            rdsem_.wait();
     }
 
     // TODO: try_read_lock()
     
     void unlock_shared() {
-        if (count_.fetch_add(1, std::memory_order_release) < 0)
-            if (rdwake_.fetch_sub(1, std::memory_order_acq_rel) == 1)
-                wrwset_.post();
+        if (rdcount_.fetch_add(1, std::memory_order_release) < 0)
+            if (rdwait_.fetch_add(-1, std::memory_order_acquire) == 1)
+                wrsem_.post();
     }
     
     void lock() {
-        if (wrstate_.fetch_sub(1, std::memory_order_acquire) < 1)
-            wrmtx_.wait();
-        int const count = count_.fetch_sub(LONG_MAX, std::memory_order_acquire);
+        wrmtx_.lock();
+        long const count = rdcount_.fetch_add(-LONG_MAX, std::memory_order_acquire);
         if (count < LONG_MAX) {
-            int rdwake = rdwake_.fetch_add(LONG_MAX - count, std::memory_order_acquire);
-            if (rdwake + LONG_MAX - count)
-                wrwset_.wait();
+            long const rdwait = rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire);
+            if (rdwait + LONG_MAX - count)
+                wrsem_.wait();
         }
     }
 
     // TODO: try_write_unlock()
     
     void unlock() {
-        int const count = count_.fetch_add(LONG_MAX, std::memory_order_release);
+        int const count = rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
         if (count < 0)
-            rdwset_.post(-count);
-        if (wrstate_.fetch_add(1, std::memory_order_release) < 0)
-            wrmtx_.post();
+            rdsem_.post(-count);
+        wrmtx_.unlock();
     }
     
 private:
-    semaphore       	rdwset_{0};
-    semaphore       	wrwset_{0};
-    semaphore       	wrmtx_{0};
-    std::atomic_long 	wrstate_{1};
-    std::atomic_long 	count_{LONG_MAX};
-    std::atomic_long 	rdwake_{0};	
+    semaphore       	wrsem_{0};
+    semaphore       	rdsem_{0};
+    fast_mutex          wrmtx_;
+    std::atomic_long 	rdcount_{LONG_MAX};
+    std::atomic_long 	rdwait_{0};	
 };
 
 } // namespace sync
