@@ -73,10 +73,10 @@ public:
     void write_lock() {
         if (wrstate_.fetch_sub(1, std::memory_order_acquire) < 1)
             wrmtx_.wait();
-        int const count = count_.fetch_sub(INT_MAX, std::memory_order_acquire);
-        if (count < INT_MAX) {
-            int rdwake = rdwake_.fetch_add(INT_MAX - count, std::memory_order_acquire);
-            if (rdwake + INT_MAX - count)
+        int const count = count_.fetch_sub(LONG_MAX, std::memory_order_acquire);
+        if (count < LONG_MAX) {
+            int rdwake = rdwake_.fetch_add(LONG_MAX - count, std::memory_order_acquire);
+            if (rdwake + LONG_MAX - count)
                 wrwset_.wait();
         }
     }
@@ -84,7 +84,7 @@ public:
     // TODO: try_write_unlock()
     
     void write_unlock() {
-        int const count = count_.fetch_add(INT_MAX, std::memory_order_release);
+        int const count = count_.fetch_add(LONG_MAX, std::memory_order_release);
         if (count < 0)
             rdwset_.post(-count);
         if (wrstate_.fetch_add(1, std::memory_order_release) < 0)
@@ -92,12 +92,12 @@ public:
     }
     
 private:
-    semaphore       rdwset_{0};
-    semaphore       wrwset_{0};
-    semaphore       wrmtx_{0};
-    std::atomic_int wrstate_{1};
-    std::atomic_int count_{INT_MAX};
-    std::atomic_int rdwake_{0};	
+    semaphore       	rdwset_{0};
+    semaphore       	wrwset_{0};
+    semaphore       	wrmtx_{0};
+    std::atomic_long 	wrstate_{1};
+    std::atomic_long 	count_{LONG_MAX};
+    std::atomic_long 	rdwake_{0};	
 };
 
 } // namespace sync

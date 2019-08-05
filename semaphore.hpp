@@ -56,7 +56,7 @@ public:
 private:
     std::condition_variable cv_;
     std::mutex              mutex_;
-    unsigned int            count_;
+    unsigned long           count_;
 };
 
 class fast_semaphore
