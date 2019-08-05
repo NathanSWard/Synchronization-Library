@@ -27,7 +27,7 @@ public:
     }
     
 private:
-    std::atomic_flag flag_{ATOMIC_FLAG_INIT};
+    std::atomic_flag flag_ = ATOMIC_FLAG_INIT;
 };
 
 class fast_mutex {
@@ -55,22 +55,22 @@ private:
     auto_event          event_;
 };
 
-class rw_fast_mutex {
+class fast_shared_mutex {
 public:	
-    void read_lock() {
+    void lock_shared() {
         if (count_.fetch_sub(1, std::memory_order_acquire) < 1)
             rdwset_.wait();
     }
 
     // TODO: try_read_lock()
     
-    void read_unlock() {
+    void unlock_shared() {
         if (count_.fetch_add(1, std::memory_order_release) < 0)
             if (rdwake_.fetch_sub(1, std::memory_order_acq_rel) == 1)
                 wrwset_.post();
     }
     
-    void write_lock() {
+    void lock() {
         if (wrstate_.fetch_sub(1, std::memory_order_acquire) < 1)
             wrmtx_.wait();
         int const count = count_.fetch_sub(LONG_MAX, std::memory_order_acquire);
@@ -83,7 +83,7 @@ public:
 
     // TODO: try_write_unlock()
     
-    void write_unlock() {
+    void unlock() {
         int const count = count_.fetch_add(LONG_MAX, std::memory_order_release);
         if (count < 0)
             rdwset_.post(-count);
