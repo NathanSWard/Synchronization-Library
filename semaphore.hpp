@@ -59,8 +59,7 @@ private:
     unsigned long           count_;
 };
 
-class fast_semaphore
-{
+class fast_semaphore {
 public:
     explicit fast_semaphore(int count = 0) noexcept
         : count_{count}

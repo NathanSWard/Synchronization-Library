@@ -108,7 +108,7 @@ public:
 
         auto work = [task = std::move(task)] { task->(); };
         unsigned int const i = index_.fetch_add(1, std::memory_order_relaxed);
-        for(unsigned int n = 0; n < count_ * K; ++n)
+        for(unsigned int n = 0; n < count_ * LOOP_K; ++n)
             if(queues_[(i + n) % count_].try_push(std::move(work))) 
                 return result;
         queues_[i % count_].push(std::move(work));

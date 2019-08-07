@@ -11,19 +11,19 @@ namespace sync {
 
 class spinlock_mutex {
 public:
-    void lock() {
+    void lock() noexcept {
         while (flag_.test_and_set(std::memory_order_acquire))
             std::this_thread::yield();
     }
 
     [[nodiscard]]
-    bool try_lock()  {
+    bool try_lock() noexcept {
         if (flag_.test_and_set(std::memory_order_acquire))
             return false;
         return true;
     }
     
-    void unlock() {
+    void unlock() noexcept {
         flag_.clear(std::memory_order_release);
     }
     
@@ -33,21 +33,21 @@ private:
 
 class fast_mutex {
 public:
-    void lock() {
+    void lock() noexcept {
         if (state_.exchange(1, std::memory_order_acquire))
             while (state_.exchange(2, std::memory_order_acquire))
                 event_.wait();
     }
 
     [[nodiscard]]
-    bool try_lock() {
+    bool try_lock() noexcept {
         unsigned int expected = 0;
         if (state_.compare_exchange_weak(expected, 1, std::memory_order_acquire))
             return true;
         return false;
     }
     
-    void unlock() {
+    void unlock() noexcept {
         if (state_.exchange(0, std::memory_order_release) == 2)
             event_.signal();
     }
@@ -59,20 +59,20 @@ private:
 
 class fast_shared_mutex {
 public:	
-    void lock_shared() {
+    void lock_shared() noexcept {
         if (rdcount_.fetch_add(-1, std::memory_order_acquire) < 1)
             rdsem_.wait();
     }
 
     // TODO: try_read_lock()
     
-    void unlock_shared() {
+    void unlock_shared() noexcept {
         if (rdcount_.fetch_add(1, std::memory_order_release) < 0)
             if (rdwait_.fetch_add(-1, std::memory_order_acquire) == 1)
                 wrsem_.post();
     }
     
-    void lock() {
+    void lock() noexcept {
         wrmtx_.lock();
         long const count = rdcount_.fetch_add(-LONG_MAX, std::memory_order_acquire);
         if (count < LONG_MAX) {
@@ -84,7 +84,7 @@ public:
 
     // TODO: try_write_unlock()
     
-    void unlock() {
+    void unlock() noexcept {
         int const count = rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
         if (count < 0)
             rdsem_.post(-count);
