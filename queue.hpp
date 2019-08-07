@@ -99,15 +99,16 @@ private:
     bool                                    done_{false};
 };
 
-template<class T>
+template<class T, class Allocator = std::allocator<T>>
 class blocking_queue {
 public:
     explicit blocking_queue(unsigned int size)
         : open_slots_{size}
-        , data_{static_cast<T*>(new(size * sizeof(T)))}
+		, data_{static_cast<T*>(Allocator{}.allocate(size))}
         , size_{size}
-    {	
+    {
         assert(size != 0);
+		std::vector<int>;
     }
 
     ~blocking_queue() {
@@ -115,7 +116,7 @@ public:
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
         }
-        delete(data_);
+		Allocator{}.deallocate(data_, size_);
     }
 
     template<class ...Args>
@@ -208,9 +209,9 @@ public:
     }
 
 private:
-    fast_semaphore 		open_slots_;
-    fast_semaphore 		full_slots_{0};
-    fast_mutex 			mutex_;
+    fast_semaphore      open_slots_;
+    fast_semaphore      full_slots_{0};
+    fast_mutex          mutex_;
     T*                  data_;
     unsigned int const  size_;
     unsigned int        push_index_{0};
@@ -218,12 +219,12 @@ private:
     unsigned int        count_{0};
 };
 
-template<class T>
+template<class T, class Allocator = std::allocator<T>>
 class lock_free_queue {
 public:
     explicit lock_free_queue(unsigned int size)
         : open_slots_{size}
-        , data_(static_cast<T*>(new(size * sizeof(T))))
+        , data_{static_cast<T*>(Allocator{}.allocate(size))}
         , size_{size}
     {
         assert(size != 0);
@@ -234,7 +235,7 @@ public:
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
         }
-        delete(data_);
+		Allocator{}.deallocate(data_, size_);
     }
 
     template<class ...Args>
@@ -292,7 +293,7 @@ public:
     template<class U>
     [[nodiscard]]
     bool try_pop(U& item) noexcept {
-        if(!full_slots_.wait_for(std::chrono::seconds(0))) 
+		if (!full_slots_.wait_for(std::chrono::seconds{0}))
             return false;
 
         auto popIndex = pop_index_.fetch_add(1, std::memory_order_release);
