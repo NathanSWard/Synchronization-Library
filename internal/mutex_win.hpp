@@ -1,3 +1,5 @@
+#pragma once
+
 #include <synchapi.h>
 
 namespace sync {

@@ -7,9 +7,11 @@
 #include <atomic>
 #include <climits>
 #include <thread>
+#include <utility>
 
 namespace sync {
 
+// Mutex Types
 class mutex {
 public:
     mutex() {
@@ -34,12 +36,66 @@ public:
         release_mutex(mtx_);
     }
 
-    auto& native_handle() {
-        return mtx_.handle_;
+    auto native_handle() {
+        return &mtx_.handle_;
     }
 
 private:
     sync_mutex mtx_{};
+};
+
+class timed_mutex {
+public:
+    timed_mutex() {
+        initialize_mutex(mtx_);
+    }
+
+    timed_mutex(timed_mutex const&) = delete;
+
+    ~timed_mutex() {
+        destroy_mutex(mtx_);
+    }
+
+    void lock() {
+        acquire_mutex(mtx_);
+    }
+
+    bool try_lock() {
+        return try_acquire_mutex(mtx_);
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(std::chrono::duration<Rep, Period> const& dur) {
+        return try_lock_until(std::chrono::steady_clock::now() + dur);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(std::chrono::time_point<Clock,Duration> const& time) {
+        using namespace std::chrono;
+        unique_lock lock{mtx_};
+        bool no_timeout{Clock::now() < time};
+        while (no_timeout && locked_)
+            no_timeout = cv_.wait_until(lock, time) == cv_status::no_timeout;
+        if (!locked_) {
+            locked_ = true;
+            return true;
+        }
+        return false;
+    }
+	
+    void unlock() {
+        release_mutex(mtx_);
+        locked_ = false;
+    }
+
+    auto native_handle() {
+        return &mtx_.handle_;
+    }
+
+private:
+    sync_mutex          mtx_;
+    condition_variable  cv_;
+    bool                locked_{false};
 };
 
 class spinlock_mutex {
@@ -166,5 +222,146 @@ class rw_mutex {
     private:
         sync_rw_mutex mtx_{};
 };
+
+// Lock Types
+
+struct defer_lock_t { explicit defer_lock_t() = default; };
+struct try_to_lock_t { explicit try_to_lock_t() = default; };
+struct adopt_lock_t { explicit adopt_lock_t() = default; };
+
+template<class Mutex>
+class lock_guard {
+public:
+    using mutex_type = Mutex;
+
+    explicit lock_guard(mutex_type& m)
+        : mtx_{m}
+    {
+        mtx_.lock();
+    }
+
+    lock_guard(mutex_type& m, adopt_lock_t t)
+        : mtx_{m}
+    {}
+
+    lock_guard(const lock_guard&) = delete;
+
+    ~lock_guard() {
+        mtx_.unlock();
+    }
+
+private:
+    mutex_type& mtx_;
+};
+
+template<class Mutex>
+class unique_lock {
+public:
+    using mutex_type = Mutex;
+
+    // Constructors
+    unique_lock() = default;
+    
+    unique_lock(unique_lock&&) = default;
+
+    unique_lock(mutex_type& m)
+        : mtx_{&m}
+        , owns_{true}
+    {
+        mtx_.lock();
+    }
+
+    unique_lock(mutex_type& m, defer_lock_t t)
+        : mtx_{&m}
+    {}
+    
+    unique_lock(mutex_type& m, try_to_lock_t t) 
+        : mtx_{&m}
+        , owns_{mtx_.try_lock()}
+    {}
+
+    unique_lock(mutex_type& m, adopt_lock_t t) 
+        : mtx_{&m}
+        , owns_{true}
+    {}
+
+    template< class Rep, class Period >
+    unique_lock(mutex_type& m, std::chrono::duration<Rep,Period> const& timeout_duration)
+        : mtx_{&m}
+        , owns_{mtx_.try_lock_for(timeout_duration)}
+    {}
+
+    template< class Clock, class Duration >
+    unique_lock(mutex_type& m, std::chrono::time_point<Clock,Duration> const& timeout_time)
+        : mtx_{&m}
+        , owns_{mtx_try_lock_until(timeout_time)}
+
+    // Destructor
+    ~unique_lock() {
+        if (owns_)
+            mtx_.unlock();
+    }
+
+    // assignment operator
+    unique_lock& operator=(unique_lock&& other) = default;
+
+    // Locking
+    void lock() {
+        mtx_.lock();    
+    }
+
+    bool try_lock() {
+        mtx_.try_lock();
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(std::chrono::duration<Rep,Period> const& timeout_duration) {
+        owns_ = mtx_.try_lock_for(timeout_duration);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(std::chrono::time_point<Clock,Duration> const& timeout_time) {
+        owns_ = mtx_.try_lock_until(timeout_time);
+    }
+
+    void unlock() {
+        mtx_.unlock();
+        owns_ = false;
+    }
+
+    // Modifiers
+    void swap(unique_lock& other) {
+        std::swap(mtx_, other.mtx_);
+        std::swap(owns_, other.owns_);
+    }
+
+    mutex_type* release() noexcept {
+        mutex_type* mptr{std::exchange(mtx_, nullptr)};
+        owns_ = false;
+        return mptr;
+    }
+
+    // Observers
+    mutex_type* mutex() const noexcept {
+        return mtx_;
+    }
+
+    bool owns_lock() const noexcept {
+        return owns_;
+    }
+
+    explicit operator bool() const noexcept {
+        return owns_;
+    }
+
+private:
+    Mutex*  mtx_{nullptr};
+    bool    owns_{false};
+};
+
+template<typename Mutex>
+inline void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept { 
+    x.swap(y); 
+}
 
 } // namespace sync
