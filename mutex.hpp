@@ -1,6 +1,7 @@
 #pragma once
 
 #include "event.hpp"
+#include "internal/mutex.hpp"
 #include "semaphore.hpp"
 
 #include <atomic>
@@ -8,6 +9,38 @@
 #include <thread>
 
 namespace sync {
+
+class mutex {
+public:
+    mutex() {
+        initialize_mutex(mtx_);
+    }
+
+    mutex(mutex const&) = delete;
+
+    ~mutex() {
+        destroy_mutex(mtx_);
+    }
+
+    void lock() {
+        acquire_mutex(mtx_);
+    }
+
+    bool try_lock() {
+        return try_acquire_mutex(mtx_);
+    }
+
+    void unlock() {
+        release_mutex(mtx_);
+    }
+
+    auto& native_handle() {
+        return mtx_.handle_;
+    }
+
+private:
+    sync_mutex mtx_{};
+};
 
 class spinlock_mutex {
 public:
@@ -64,7 +97,7 @@ public:
             rdsem_.wait();
     }
 
-    // TODO: try_read_lock()
+    // TODO: try_lock_shared()
     
     void unlock_shared() noexcept {
         if (rdcount_.fetch_add(1, std::memory_order_release) < 0)
@@ -82,7 +115,7 @@ public:
         }
     }
 
-    // TODO: try_write_unlock()
+    // TODO: try_lock()
     
     void unlock() noexcept {
         int const count = rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
@@ -97,6 +130,41 @@ private:
     fast_mutex          wrmtx_;
     std::atomic_long 	rdcount_{LONG_MAX};
     std::atomic_long 	rdwait_{0};	
+};
+
+
+class rw_mutex {
+    public:
+        rw_mutex() {
+            initialize_mutex(mtx_);
+        }
+
+        void lock() {
+            acquire_mutex_wr(mtx_);
+        }
+
+        bool try_lock() {
+            try_acquire_mutex_wr(mtx_);
+        }
+        
+        void unlock() {
+            release_mutex_wr(mtx_);
+        }
+    
+        void lock_shared() {
+            acquire_mutex_rd(mtx_);
+        }
+
+        bool try_lock_shared() {
+            try_acquire_mutex_rd(mtx_);
+        }
+        
+        void unlock_shared() {
+            release_mutex_rd(mtx_);
+        }
+        
+    private:
+        sync_rw_mutex mtx_{};
 };
 
 } // namespace sync

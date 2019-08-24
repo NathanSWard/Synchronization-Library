@@ -95,7 +95,7 @@ public:
 private:
     std::queue<std::deque<T, Allocator>>    queue_;
     std::condition_variable                 ready_;
-    std::mutex                              mutex_;
+    mutex                                   mutex_;
     bool                                    done_{false};
 };
 
