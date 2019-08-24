@@ -9,7 +9,7 @@ namespace sync {
 
 class semaphore {
 public:
-    explicit semaphore(unsigned int count = 0) noexcept
+    explicit semaphore(unsigned long count = 0) noexcept
         : count_{count} 
     {}
 
@@ -77,8 +77,8 @@ public:
             semaphore_.wait();
     }
 private:
-    semaphore       semaphore_{0};
-    std::atomic_int count_;
+    semaphore           semaphore_{0};
+    std::atomic_long    count_;
 };
 
 } // namespace sync

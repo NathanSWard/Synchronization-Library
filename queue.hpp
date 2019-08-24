@@ -44,7 +44,7 @@ public:
     bool pop(U& item) {
         std::unique_lock lock{mutex_};
         ready_.wait(lock [this]{return !queue_.empty() || done_});
-        if(queue_.empty()) 
+        if (queue_.empty()) 
             return false;
 
         if constexpr (std::is_assignable_v<U&, T&&>)
@@ -60,7 +60,7 @@ public:
     [[nodiscard]] 
     bool try_pop(U& item) {
         std::unique_lock lock{mutex_, std::try_to_lock};
-        if(!lock || queue_.empty()) 
+        if (!lock || queue_.empty()) 
             return false;
 
         if constexpr (std::is_assignable_v<U&, T&&>)
