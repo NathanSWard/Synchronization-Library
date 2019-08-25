@@ -13,5 +13,5 @@
     #define SYNC_MAC 0
     #define SYNC_LINUX 1
 #else
-#   error "Unknown compiler"
+    #error "Unknown compiler"
 #endif
