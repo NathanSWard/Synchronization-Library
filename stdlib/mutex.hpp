@@ -6,7 +6,37 @@ namespace sync {
 
 // Mutex Types
 
-// class recursive_mutex;
+class recursive_mutex {
+public:
+    recursive_mutex() {
+        initialize_mutex(mtx_);
+    }
+
+    recursive_mutex(recursive_mutex const&) = delete;
+
+    ~recursive_mutex() {
+        destroy_mutex(mtx_);
+    }
+
+    void lock() {
+        acquire_mutex(mtx_);
+    }
+
+    bool try_lock() {
+        return try_acquire_mutex(mtx_);
+    }
+
+    void unlock() {
+        release_mutex(mtx_);
+    }
+
+    auto native_handle() {
+        return &mtx_;
+    }
+
+private:
+    sync_mtx_t mtx_ = SYNC_RECURSIVE_MTX_INIT;
+};
 
 class timed_mutex {
 public:
