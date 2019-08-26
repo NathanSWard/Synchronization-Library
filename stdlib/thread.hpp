@@ -29,8 +29,11 @@ public:
 
     template <class Function, class ...Args>
     explicit thread(Function&& f, Args&&... args) {
-        initialize_thread(_handle, 
-            [&](void*) -> void* {std::forward<Function>(f)(std::forward<Args>(args)...); return nullptr;},
+        initialize_thread(handle_, 
+            [f = std::forward<Function>(f), ...args = std::forward<Args>(args)](void*) -> void* { // c++20 perfect caputre
+                f(args...); 
+                return nullptr;
+            },
             nullptr);
     }
 
