@@ -90,7 +90,7 @@ void broadcast_cv(sync_cv_t&);
             ts.tv_sec = ts_sec_max;
             ts.tv_nsec = std::giga::num - 1;
         }
-        pthread_cond_timewait(&cv, &mtx, &ts);
+        pthead_cond_timedwait(&cv, &mtx, &ts);
     }
 
     void signal_cv(sync_cv_t& cv) {
