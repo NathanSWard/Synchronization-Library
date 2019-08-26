@@ -39,7 +39,7 @@ public:
             nullptr);
         */
         initialize_thread(handle_,
-            [f = std::forward<Function>(f), tup = std::make_tuple(std::forward<Args>(args)...)]
+            [f = std::forward<Function>(f), tup = std::forward_as_tuple(std::forward<Args>(args)...)]
             (void*) -> void* {
                 std::apply([&](auto&&... args){
                     (void)f(args...);
