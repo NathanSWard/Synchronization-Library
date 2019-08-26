@@ -29,9 +29,21 @@ public:
 
     template <class Function, class ...Args>
     explicit thread(Function&& f, Args&&... args) {
+        /*
+        c++ 20 perfect capture
         initialize_thread(handle_, 
-            [f = std::forward<Function>(f), ...args = std::forward<Args>(args)](void*) -> void* { // c++20 perfect caputre
+            [f = std::forward<Function>(f), ...args = std::forward<Args>(args)](void*) -> void* {
                 f(args...); 
+                return nullptr;
+            },
+            nullptr);
+        */
+        initialize_thread(handle_,
+            [f = std::forward<Function>(f), tup = std::make_tuple(std::forward<Args>(args)...)]
+            (void*) -> void* {
+                std::apply([&](auto&&... args){
+                    (void)f(args...);
+                }, tup);
                 return nullptr;
             },
             nullptr);
