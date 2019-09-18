@@ -4,6 +4,10 @@
 #include "platform.hpp"
 #include "types.hpp"
 
+#if SYNC_MAC || SYNC_LINUX
+    #include <errno.h>
+#endif
+
 namespace sync {
 
 void initialize_thread(sync_thread_t&, void*(*)(void*), void*);
@@ -15,7 +19,7 @@ sync_thread_id_t get_thread_id(sync_thread_t const&);
 bool thread_id_equal(sync_thread_id_t, sync_thread_id_t);
 void thread_sleep_for(std::chrono::nanoseconds const&);
 bool is_thread_null(sync_thread_t const&);
-static unsigned int hardware_concurrency() noexcept;
+static unsigned int get_concurrency() noexcept;
 
 #if SYNC_WINDOWS
 
@@ -54,7 +58,7 @@ bool is_thread_null(sync_thread_t const& t) {
     return t == INVALID_HANDLE_VALUE;
 }
 
-unsigned int get_concurrency() noexcept {
+static unsigned int get_concurrency() noexcept {
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
     return static_cast<unsigned int>(sysinfo.dwNumberOfProcessors);
@@ -62,14 +66,12 @@ unsigned int get_concurrency() noexcept {
 
 #elif SYNC_MAC || SYNC_LINUX
 
-#include <errno.h>
-
 void initialize_thread(sync_thread_t& t, void*(*f)(void*), void* args) {
     (void)pthread_create(&t, nullptr, f, args);
 }
 
 void join_thread(sync_thread_t& t) {
-    (void)pthread_join(t, 0);
+    (void)pthread_join(t, nullptr);
 }
 
 void detach_thread(sync_thread_t& t) {

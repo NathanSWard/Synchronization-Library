@@ -3,7 +3,27 @@
 #include "internal/thread.hpp"
 
 #include <exception>
+#include <memory>
+#include <tuple>
 #include <utility>
+
+namespace {
+    template<class Fp, class... Args, std::size_t First, std::size_t ...Is>
+    inline void call_void_callable(std::tuple<Fp, Args...>& tup, std::index_sequence<First, Is...>) {
+        if constexpr (sizeof...(Is) > 0) 
+            std::get<0>(tup)((std::get<Is>(tup), ...));
+        else
+            std::get<0>(tup)();
+    }
+
+    template<class T>
+    void* void_callable(void* args) {
+        T* const ptr{static_cast<T*>(args)};
+        using idx = std::make_index_sequence<std::tuple_size_v<T>>;
+        call_void_callable(*ptr, idx{});
+        return nullptr;
+    }
+}
 
 namespace sync {
 
@@ -25,28 +45,13 @@ public:
         if (joinable())
             std::terminate();
         handle_ = std::exchange(other.handle_, SYNC_NULL_THREAD);
+        return *this;
     }
 
     template <class Function, class ...Args>
     explicit thread(Function&& f, Args&&... args) {
-        /*
-        c++ 20 perfect capture
-        initialize_thread(handle_, 
-            [f = std::forward<Function>(f), ...args = std::forward<Args>(args)](void*) -> void* {
-                f(args...); 
-                return nullptr;
-            },
-            nullptr);
-        */
-        initialize_thread(handle_,
-            [f = std::forward<Function>(f), tup = std::forward_as_tuple(std::forward<Args>(args)...)]
-            (void*) -> void* {
-                std::apply([&](auto&&... args){
-                    (void)f(args...);
-                }, tup);
-                return nullptr;
-            },
-            nullptr);
+        auto tup = std::forward_as_tuple(f, args...);
+        initialize_thread(handle_, void_callable<decltype(tup)>, static_cast<void*>(&tup));
     }
 
     ~thread() {
@@ -104,7 +109,7 @@ namespace this_thread {
 
     template<class Rep, class Period>
     void sleep_for(std::chrono::duration<Rep, Period> const& sleep_duration) {
-        thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>{sleep_duration});
+        thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration));
     }
 
     template<class Clock, class Duration>
