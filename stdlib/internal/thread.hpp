@@ -15,11 +15,53 @@ sync_thread_id_t get_thread_id(sync_thread_t const&);
 bool thread_id_equal(sync_thread_id_t, sync_thread_id_t);
 void thread_sleep_for(std::chrono::nanoseconds const&);
 bool is_thread_null(sync_thread_t&);
-int get_concurrency();
-
-}
+static unsigned int hardware_concurrency() noexcept;
 
 #if SYNC_WINDOWS
+
+void initialize_thread(sync_thread_t& t, void*(*f)(void*), void* args) {
+    t = CreateThread(nullptr, 0, f, args, 0);
+}
+
+void join_thread(sync_thread_t& t) {
+    (void)WaitForSingleObject(t, INFINITE);
+    (void)CloseHandle(t);
+}
+
+void detach_thread(sync_thread_t&) {
+    (void)CloseHandle(t);
+}
+
+void yeild_thread() {
+    (void)SwitchToThread();
+}
+sync_thread_id_t get_curr_thread_id() {
+    return GetCurrentThreadId();
+}
+sync_thread_id_t get_thread_id(sync_thread_t const& t) {
+    return GetThreadId(t);
+}
+
+bool thread_id_equal(sync_thread_id_t a, sync_thread_id_t b) {
+    return a == b;
+}
+
+void thread_sleep_for(std::chrono::nanoseconds const& ns) {
+    Sleep(static_cast<DWORD>(std::chrono::duration_cast<std::chrono::milliseconds>(ns).count()));
+}
+
+bool is_thread_null(sync_thread_t& t) {
+    return t == INVALID_HANDLE_VALUE;
+}
+
+static unsigned int hardware_concurrency() noexcept {
+    static unsigned int const hc = [] {
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return static_cast<unsigned int>(sysinfo.dwNumberOfProcessors);
+    }();
+    return hc;
+}
 
 #elif SYNC_MAC || SYNC_LINUX
 
@@ -75,8 +117,10 @@ bool is_thread_null(sync_thread_t& t) {
     return t == 0;
 }
 
-unsigned int get_concurrency() {
+static unsigned int get_concurrency() noexcept {
     return static_cast<unsigned int>(pthread_getconcurrency());
 }
 
 #endif
+
+}

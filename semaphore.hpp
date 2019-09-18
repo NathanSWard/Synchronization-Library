@@ -15,7 +15,7 @@ public:
 
     void post() noexcept {
         {
-            std::scoped_lock lock(mutex_);
+            std::scoped_lock lock{mutex_};
             ++count_;
         }
         cv_.notify_one();
@@ -44,8 +44,8 @@ public:
         return true;
     }
 
-    template<class Duration>
-    bool wait_until(Duration&& d) noexcept {
+    template<class TimePoint>
+    bool wait_until(TimePoint&& d) noexcept {
         std::unique_lock lock{mutex_};
         if(!cv_.wait_until(lock, d, [this] { return count_ != 0; }))
             return false;
@@ -57,6 +57,11 @@ private:
     std::condition_variable cv_;
     std::mutex              mutex_;
     unsigned long           count_;
+};
+
+class binary_semaphore {
+public:
+private:
 };
 
 class fast_semaphore {

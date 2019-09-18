@@ -43,7 +43,7 @@ public:
             (void*) -> void* {
                 std::apply([&](auto&&... args){
                     (void)f(args...);
-                }, tup);
+                }, std::move(tup));
                 return nullptr;
             },
             nullptr);
