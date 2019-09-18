@@ -1,8 +1,10 @@
 #pragma once
 
 #include "_mutex_base.hpp"
+#include <atomic>
 #include <thread>
 #include <tuple>
+#include <utility>
 
 namespace sync {
 
@@ -283,6 +285,22 @@ private:
     std::tuple<MutexTypes&...> mtxs_;
 };
 
-// class call_once;
+class once_flag {
+public:
+    constexpr once_flag() noexcept {}
+
+private:
+    template<class F, class... Args>
+    friend void call_once(F&&, Args&&...);
+    
+    std::atomic<bool> flag_{false};
+};
+
+template<class Callable, class... Args>
+void call_once(once_flag& flag, Callable&& f, Args&&... args) {
+    bool called{false};
+    if (flag.flag_.compare_exchange_strong(called, true, std::memory_order_release, std::memory_order_acquire))
+        std::forward<Callable>(f)(std::forward<Args>(args)...);
+}
 
 }
