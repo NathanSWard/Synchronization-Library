@@ -43,7 +43,7 @@ public:
             (void*) -> void* {
                 std::apply([&](auto&&... args){
                     (void)f(args...);
-                }, std::move(tup));
+                }, tup);
                 return nullptr;
             },
             nullptr);
@@ -68,7 +68,8 @@ public:
     }
 
     static unsigned int hardward_concurrency() noexcept {
-        get_concurrency();
+        static auto hc = []{ return get_concurrency(); }();
+        return hc;
     } 
 
     // Operations
@@ -93,7 +94,23 @@ inline void swap(thread& x, thread& y) noexcept {
 }
 
 namespace this_thread {
-    // TODO
+    void yield() noexcept {
+        yeild_thread();
+    }
+
+    thread::id get_id() noexcept {
+        return get_curr_thread_id();
+    }
+
+    template<class Rep, class Period>
+    void sleep_for(std::chrono::duration<Rep, Period> const& sleep_duration) {
+        thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>{sleep_duration});
+    }
+
+    template<class Clock, class Duration>
+    void sleep_until(std::chrono::time_point<Clock, Duration> const& sleep_time) {
+        sleep_for(sleep_time - Clock::now());
+    }
 }
 
 /*
