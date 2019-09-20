@@ -97,7 +97,58 @@ private:
     bool                locked_{false};
 };
 
-// class recursive_timed_mutex;
+class recursive_timed_mutex {
+public:
+    recursive_timed_mutex() {
+        initialize_mutex(mtx_);
+    }
+
+    recursive_timed_mutex(timed_mutex const&) = delete;
+
+    ~recursive_timed_mutex() {
+        destroy_mutex(mtx_);
+    }
+
+    void lock() {
+        acquire_mutex(mtx_);
+    }
+
+    bool try_lock() {
+        return try_acquire_mutex(mtx_);
+    }
+
+    template<class Rep, class Period>
+    bool try_lock_for(std::chrono::duration<Rep, Period> const& dur) {
+        return try_lock_until(std::chrono::steady_clock::now() + dur);
+    }
+
+    template<class Clock, class Duration>
+    bool try_lock_until(std::chrono::time_point<Clock,Duration> const& time) {
+        unique_lock lock{mtx_};
+        bool no_timeout{Clock::now() < time};
+        while (no_timeout && locked_)
+            no_timeout = cv_.wait_until(lock, time) == cv_status::no_timeout;
+        if (!locked_) {
+            locked_ = true;
+            return true;
+        }
+        return false;
+    }
+	
+    void unlock() {
+        release_mutex(mtx_);
+        locked_ = false;
+    }
+
+    auto native_handle() {
+        return &mtx_;
+    }
+
+private:
+    sync_mtx_t          mtx_ = SYNC_RECURSIVE_MTX_INIT;
+    condition_variable  cv_;
+    bool                locked_{false};   
+};
 
 // locking functions
 
@@ -140,7 +191,7 @@ void lock(M0& m0, M1& m1) {
                 break;
             }
         }
-        std::this_thread::yield();
+        this_thread::yield();
         {
             unique_lock lock(m1);
             if (m0.try_lock())
@@ -149,7 +200,7 @@ void lock(M0& m0, M1& m1) {
                 break;
             }
         }
-       std::this_thread::yield();
+        this_thread::yield();
     }
 }
 
@@ -167,7 +218,7 @@ void _lock_first(int i, M0& m0, M1& m1, M2& m2, MN& ...mn) {
                     }
                 }
                 ++i;
-                std::this_thread::yield();
+                this_thread::yield();
                 break;
             case 1:
                 {
@@ -182,7 +233,7 @@ void _lock_first(int i, M0& m0, M1& m1, M2& m2, MN& ...mn) {
                     i = 0;
                 else
                     i += 2;
-                std::this_thread::yield();
+                this_thread::yield();
                 break;
             default:
                 _lock_first(i - 2, m2, mn..., m0, m1);
