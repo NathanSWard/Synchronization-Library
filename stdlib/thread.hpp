@@ -3,22 +3,26 @@
 #include "internal/thread.hpp"
 
 #include <exception>
+#include <functional>
 #include <memory>
 #include <tuple>
 #include <utility>
 
+// helper namespace for thead::thread construction with function args
 namespace {
-    template<class Fp, class... Args, std::size_t First, std::size_t ...Is>
-    inline void call_void_callable(std::tuple<Fp, Args...>& tup, std::index_sequence<First, Is...>) {
-        if constexpr (sizeof...(Is) > 0) 
-            std::get<0>(tup)((std::get<Is>(tup), ...));
-        else
-            std::get<0>(tup)();
+    template<class T>
+    std::decay_t<T> decay_copy(T&& t) {
+        return std::forward<T>(t);
+    }
+    
+    template<class Fp, class... Args, std::size_t ...Is>
+    inline void call_void_callable(std::tuple<Fp, Args...>& tup, std::index_sequence<Is...>) {
+        std::invoke(std::move(std::get<Is>(tup))...); 
     }
 
     template<class T>
     void* void_callable(void* args) {
-        T* const ptr{static_cast<T*>(args)};
+        std::unique_ptr<T> ptr{static_cast<T*>(args)};
         using idx = std::make_index_sequence<std::tuple_size_v<T>>;
         call_void_callable(*ptr, idx{});
         return nullptr;
@@ -48,10 +52,13 @@ public:
         return *this;
     }
 
-    template <class Function, class ...Args>
-    explicit thread(Function&& f, Args&&... args) {
-        auto tup = std::forward_as_tuple(f, args...);
-        initialize_thread(handle_, void_callable<decltype(tup)>, static_cast<void*>(&tup));
+    template <class Fn, class ...Args>
+    explicit thread(Fn&& f, Args&&... args) {
+        using Tup = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;  
+        std::unique_ptr<Tup> ptr{
+            std::make_unique<Tup>(decay_copy(std::forward<Fn>(f)), 
+                                  decay_copy(std::forward<Args>(args))...)};
+        initialize_thread(handle_, &void_callable<Tup>, static_cast<void*>(ptr.release()));
     }
 
     ~thread() {
@@ -61,7 +68,7 @@ public:
 
     // Observers
     bool joinable() {
-        return is_thread_null(handle_);
+        return !is_thread_null(handle_);
     }
 
     id get_id() const noexcept {
@@ -73,8 +80,7 @@ public:
     }
 
     static unsigned int hardward_concurrency() noexcept {
-        static auto hc = []{ return get_concurrency(); }();
-        return hc;
+        return get_concurrency();
     } 
 
     // Operations

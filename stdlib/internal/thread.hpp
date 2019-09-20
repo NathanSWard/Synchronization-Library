@@ -72,6 +72,7 @@ void initialize_thread(sync_thread_t& t, void*(*f)(void*), void* args) {
 
 void join_thread(sync_thread_t& t) {
     (void)pthread_join(t, nullptr);
+    t = SYNC_NULL_THREAD;
 }
 
 void detach_thread(sync_thread_t& t) {
