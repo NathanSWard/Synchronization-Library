@@ -98,7 +98,7 @@ bool thread_id_equal(sync_thread_id_t t1, sync_thread_id_t t2) {
 void thread_sleep_for(std::chrono::nanoseconds const& ns) {
    std::chrono::seconds s = std::chrono::duration_cast<std::chrono::seconds>(ns);
    ::timespec ts;
-   typedef decltype(ts.tv_sec) ts_sec;
+   using ts_sec = decltype(ts.tv_sec);
    constexpr ts_sec ts_sec_max = std::numeric_limits<ts_sec>::max();
 
    if (s.count() < ts_sec_max) {
