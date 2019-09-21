@@ -1,7 +1,7 @@
 #pragma once
 
-#include "platform.hpp"
-#include "types.hpp"
+#include "include/assert.hpp"
+#include "include/types.hpp"
 
 namespace sync {
 
@@ -78,11 +78,11 @@ namespace sync {
     
     // basic mutex
     void initialize_mutex(sync_mtx_t& mtx) {
-        pthread_mutex_init(&mtx, nullptr);
+        SYNC_POSIX_ASSERT(pthread_mutex_init(&mtx, nullptr), "pthread_mutex_init failed");
     }
     
     void acquire_mutex(sync_mtx_t& mtx) {
-        pthread_mutex_lock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_mutex_lock(&mtx), "pthread_mutex_lock failed");
     }
 
     bool try_acquire_mutex(sync_mtx_t& mtx) {
@@ -90,28 +90,28 @@ namespace sync {
     }
 
     void release_mutex(sync_mtx_t& mtx) {
-        pthread_mutex_unlock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_mutex_unlock(&mtx), "pthread_mutex_unlock failed");
     }
     
     void destroy_mutex(sync_mtx_t& mtx) {
-        pthread_mutex_destroy(&mtx);
+        SYNC_POSIX_ASSERT(pthread_mutex_destroy(&mtx), "pthread_mutex_destroy failed");
     }
 
     // reader writer mutex
     void initialize_mutex(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_init(&mtx, nullptr);
+        SYNC_POSIX_ASSERT(pthread_rwlock_init(&mtx, nullptr), "pthread_rwlock_init failed");
     }
 
     void destroy_mutex(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_destroy(&mtx);
+        SYNC_POSIX_ASSERT(pthread_rwlock_destroy(&mtx), "pthread_rwlock_destroy failed");
     }
 
     void acquire_mutex_wr(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_wrlock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_rwlock_wrlock(&mtx), "pthread_rwlock_wrlock failed");
     }
 
     void acquire_mutex_rd(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_rdlock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_rwlock_rdlock(&mtx), "pthread_rwlock_rdlock failed");
     }
 
     bool try_acquire_mutex_wr(sync_rw_mtx_t& mtx) {
@@ -123,11 +123,11 @@ namespace sync {
     }
 
     void release_mutex_wr(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_unlock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_rwlock_unlock(&mtx), "pthread_rwlock_unlock failed");
     }
 
     void release_mutex_rd(sync_rw_mtx_t& mtx) {
-        pthread_rwlock_unlock(&mtx);
+        SYNC_POSIX_ASSERT(pthread_rwlock_unlock(&mtx), "pthread_rwlock_unlock failed");
     }
 
 #endif

@@ -1,6 +1,7 @@
 // shared_mutex.hpp
 
 #include "condition_variable.hpp"
+#include "include/assert.hpp"
 #include "mutex.hpp"
 
 namespace sync {
@@ -196,46 +197,37 @@ public:
     }
 
     void lock() {
-        if (mtx_ == nullptr)
-            ; // throw_system_error
-        if (owns_)
-            ; //throw_system_error
+        SYNC_ASSERT(mtx_ != nullptr, "shared_lock::lock, mutex is null");
+        SYNC_ASSERT(owns_, "shard_lock::lock, does not own mutex");
         mtx_->lock_shared();
         owns_ = true;
     }
 
     bool try_lock() {
-         if (mtx_ == nullptr)
-            ; // throw_system_error
-        if (owns_)
-            ; //throw_system_error
+        SYNC_ASSERT(mtx_ != nullptr, "shared_lock::try_lock, mutex is null");
+        SYNC_ASSERT(owns_, "shard_lock::try_lock, does not own mutex");
         owns_ = mtx_->try_lock_shared();
         return owns_;       
     }
     
     template<class Rep, class Period>
     bool try_lock_for(std::chrono::duration<Rep, Period> const& rel_time) {
-         if (mtx_ == nullptr)
-            ; // throw_system_error
-        if (owns_)
-            ; //throw_system_error
+        SYNC_ASSERT(mtx_ != nullptr, "shared_lock::try_lock_for, mutex is null");
+        SYNC_ASSERT(owns_, "shard_lock::try_lock_for, does not own mutex");
         owns_ = mtx_->try_lock_shared_for(rel_time);
         return owns_;      
     }
     
     template<class Clock, class Dur>
     bool try_lock_until(std::chrono::time_point<Clock, Dur> const& abs_time) {
-        if (mtx_ == nullptr)
-            ; // throw_system_error
-        if (owns_)
-            ; //throw_system_error
+        SYNC_ASSERT(mtx_ != nullptr, "shared_lock::try_lock_until, mutex is null");
+        SYNC_ASSERT(owns_, "shard_lock::try_lock_until, does not own mutex");
         owns_ = mtx_->try_lock_shared_until(abs_time);
         return owns_;             
     }
     
     void unlock() {
-        if (!owns_)
-            ; //throw_system_error
+        SYNC_ASSERT(!owns_, "shared_lock::unlock, does not own mutex");
         mtx_->unlock_shared();
         owns_ = false;
     }

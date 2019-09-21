@@ -67,7 +67,7 @@ public:
     }
 
     // Observers
-    bool joinable() {
+    bool joinable() const noexcept {
         return !is_thread_null(handle_);
     }
 
@@ -85,10 +85,12 @@ public:
 
     // Operations
     void join() {
+        SYNC_ASSERT(!joinable(), "thread::join, trying to join an unjoinable thread");
         join_thread(handle_);
     }
 
     void detach() {
+        SYNC_ASSERT(!joinable(), "thread::join, trying to detach an unjoinable thread");
         detach_thread(handle_);
     }
 

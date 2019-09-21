@@ -248,7 +248,7 @@ public:
 
     template<class Clock, class Duration>
     cv_status wait_until(unique_lock<mutex>& lock,
-                                std::chrono::time_point<Clock, Duration> const& time) {
+                            std::chrono::time_point<Clock, Duration> const& time) {
         using namespace std::chrono;
         wait_for(lock, time - Clock::now());
         return Clock::now() < time ? cv_status::no_timeout : cv_status::timeout;

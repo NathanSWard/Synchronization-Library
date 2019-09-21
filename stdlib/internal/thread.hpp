@@ -67,20 +67,20 @@ static unsigned int get_concurrency() noexcept {
 #elif SYNC_MAC || SYNC_LINUX
 
 void initialize_thread(sync_thread_t& t, void*(*f)(void*), void* args) {
-    (void)pthread_create(&t, nullptr, f, args);
+    SYNC_POSIX_ASSERT(pthread_create(&t, nullptr, f, args), "pthread_create failed");
 }
 
 void join_thread(sync_thread_t& t) {
-    (void)pthread_join(t, nullptr);
+    SYNC_POSIX_ASSERT(pthread_join(t, nullptr), "pthread_join failed");
     t = SYNC_NULL_THREAD;
 }
 
 void detach_thread(sync_thread_t& t) {
-    (void)pthread_detach(t);
+    SYNC_POSIX_ASSERT(pthread_detach(t), "pthread_detach failed");
 }
 
 void yeild_thread() {
-    sched_yield();
+    SYNC_POSIX_ASSERT(sched_yield(), "sched_yield failed");
 }
 
 sync_thread_id_t get_curr_thread_id() {

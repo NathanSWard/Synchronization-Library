@@ -1,8 +1,8 @@
 #pragma once
 
 #include <chrono>
-#include "platform.hpp"
-#include "types.hpp"
+#include "include/assert.hpp"
+#include "include/types.hpp"
 
 namespace sync {
 
@@ -27,9 +27,9 @@ void broadcast_cv(sync_cv_t&);
     template<class Mutex>
     void wait_cv(sync_cv_t& cv, Mutex& mtx) {
         if constexpr (std::is_same_v<Mutex, CRITICAL_SECTION>) {
-            SleepConditionVariableCS(&cv, &mtx, INFINITE);
+            SYNC_WINDOWS_ASSERT(SleepConditionVariableCS(&cv, &mtx, INFINITE), "SleepConditionVariableCS failed");
         } else if (std::is_same_v<Mutex, SRWLock>) {
-            SleepConditionVariableSRW(&cv, &mtx, INFINITE, 0);
+            SYNC_WINDOWS_ASSERT(SleepConditionVariableSRW(&cv, &mtx, INFINITE, 0), "SleepConditionVariableSRW failed");
         } else {
             static_assert(false, "Windows wait_cv only takes a SRWLock or Cricial Section");
         }
@@ -40,9 +40,9 @@ void broadcast_cv(sync_cv_t&);
                         std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> tp) {
         auto duration{std::chrono::duration_cast<milliseconds>(tp.time_since_epoch()).count()};
         if constexpr (std::is_same_v<Mutex, CRITICAL_SECTION>) {
-            SleepConditionVariableCS(&cv, &mtx, static_cast<DWORD>(duration));
+            SYNC_WINDOWS_ASSERT(SleepConditionVariableCS(&cv, &mtx, static_cast<DWORD>(duration)), "SleepConditionVariableCS failed");
         } else if (std::is_same_v<Mutex, SRWLock>) {
-            SleepConditionVariableSRW(&cv, &mtx, static_cast<DWORD>(duration), 0);
+            SYNC_WINDOWS_ASSERT(SleepConditionVariableSRW(&cv, &mtx, static_cast<DWORD>(duration), 0), "SleepConditionVariableSRW failed");
         } else {
             static_assert(false, "Windows timed_wait_cv only takes a SRWLock or Cricial Section");
         }
@@ -59,16 +59,16 @@ void broadcast_cv(sync_cv_t&);
 #elif SYNC_MAX || SYNC_LINUX
 
     void initialize_cv(sync_cv_t& cv) {
-        pthread_cond_init(&cv, nullptr);
+        SYNC_POSIX_ASSERT(pthread_cond_init(&cv, nullptr), "pthread_cond_init failed");
     }
 
     void destroy_cv(sync_cv_t& cv) {
-        pthread_cond_destroy(&cv);
+        SYNC_POSIX_ASSERT(pthread_cond_destroy(&cv), "pthread_cond_destroy failed");
     }
 
     template<class Mutex>
     void wait_cv(sync_cv_t& cv, Mutex& mtx) {
-        pthread_cond_wait(&cv, &mtx);
+        SYNC_POSIX_ASSERT(pthread_cond_wait(&cv, &mtx), "pthread_cond_wait failed");
     }
 
     template<class Mutex>
@@ -90,15 +90,15 @@ void broadcast_cv(sync_cv_t&);
             ts.tv_sec = ts_sec_max;
             ts.tv_nsec = std::giga::num - 1;
         }
-        pthead_cond_timedwait(&cv, &mtx, &ts);
+        SYNC_POSIX_ASSERT(pthead_cond_timedwait(&cv, &mtx, &ts), "pthread_cond_timedwait failed");
     }
 
     void signal_cv(sync_cv_t& cv) {
-        pthread_cond_signal(&cv);
+        SYNC_POSIX_ASSERT(pthread_cond_signal(&cv), "pthread_cond_signal failed");
     }
 
     void broadcast_cv(sync_cv_t& cv) {
-        pthread_cond_broadcast(&cv);
+        SYNC_POSIX_ASSERT(pthread_cond_broadcast(&cv), "pthread_cond_broadcast failed");
     }
 
 #endif
