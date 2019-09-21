@@ -2,9 +2,9 @@
 
 #include <atomic>
 #include "event.hpp"
-#include "internal/mutex.hpp"
+#include "stdlib/internal/mtx.hpp"
 #include "semaphore.hpp"
-#include <thread>
+#include "stdlib/thread.hpp"
 
 namespace sync {
 
@@ -12,7 +12,7 @@ class spinlock_mutex {
 public:
     void lock() noexcept {
         while (flag_.test_and_set(std::memory_order_acquire))
-            std::this_thread::yield();
+            this_thread::yield();
     }
 
     [[nodiscard]]
@@ -63,7 +63,11 @@ public:
             rdsem_.wait();
     }
 
-    // TODO: try_lock_shared()
+    bool try_lock_shared() {
+        if (rdcount_.fetch_add(-1, std::memory_order_acquire) < 1)
+            return false;
+        return true;
+    }
     
     void unlock_shared() noexcept {
         if (rdcount_.fetch_add(1, std::memory_order_release) < 0)
@@ -73,15 +77,26 @@ public:
     
     void lock() noexcept {
         wrmtx_.lock();
-        long const count = rdcount_.fetch_add(-LONG_MAX, std::memory_order_acquire);
+        long const count{rdcount_.fetch_sub(LONG_MAX, std::memory_order_acquire)};
         if (count < LONG_MAX) {
-            long const rdwait = rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire);
+            long const rdwait{rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire)};
             if (rdwait + LONG_MAX - count)
                 wrsem_.wait();
         }
     }
 
-    // TODO: try_lock()
+    bool try_lock() {
+        if (!wrmtx_.try_lock())
+            return false;
+        long const count{rdcount_.fetch_sub(LONG_MAX, std::memory_order_acquire)};
+        if (cout < LONG_MAX) {
+            long const rdwait{rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire)};
+            if (!(rdwait + LONG_MAX - count))
+                return true;
+        }
+        rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
+        return false;
+    }
     
     void unlock() noexcept {
         int const count = rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
@@ -97,7 +112,6 @@ private:
     std::atomic_long 	rdcount_{LONG_MAX};
     std::atomic_long 	rdwait_{0};	
 };
-
 
 class rw_mutex {
     public:
@@ -130,6 +144,6 @@ class rw_mutex {
         }
         
     private:
-        sync_rw_mutex mtx_{};
+        sync_rw_mutex_t mtx_{};
 };
 }
