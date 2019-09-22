@@ -11,7 +11,7 @@
 
 namespace sync {
 
-template<class T, class Allocator = std::allocator<T>>
+template<class T, class Queue>
 class simple_blocking_queue {
 public:
     template<class ...Args>
@@ -37,19 +37,19 @@ public:
     }
 
     [[nodiscard]] 
-    std::optional<T> pop(T& item) {
+    std::optional<T> pop() {
         std::unique_lock lock{mutex_};
         ready_.wait(lock, [this]{return !queue_.empty() || done_;});
         if (queue_.empty()) 
             return {};
 
         if constexpr (std::is_move_constructible_v<T>)
-            auto item = std::move(queue_.front());
+            std::optional<T> opt{std::move(queue_.front())};
         else
-            auto item = queue_.front();
+            std::optional<T> opt{queue_.front()};
         
         queue_.pop();
-        return item;
+        return opt;
     }
 
     [[nodiscard]] 
@@ -59,12 +59,12 @@ public:
             return {};
 
         if constexpr (std::is_move_constructible_v<T>)
-            auto item = std::move(queue_.front());
+            std::optional<T> opt{std::move(queue_.front())};
         else
-            auto item = queue_.front();
+            std::optional<T> opt{queue_.front()};
 
         queue_.pop();
-        return item;
+        return opt;
     }
 
     void done() noexcept {
@@ -88,10 +88,10 @@ public:
     }
 
 private:
-    std::queue<T, std::deque<T, Allocator>> queue_;
-    std::condition_variable                 ready_;
-    mutex                                   mutex_;
-    bool                                    done_{false};
+    Queue                   queue_;
+    std::condition_variable ready_;
+    std::mutex              mutex_;
+    bool                    one_{false};
 };
 
 template<class T, 
@@ -144,16 +144,16 @@ public:
         return true;
     }
 
-    template<class U>
-    void pop(U& item) noexcept {
+    std::optional<T> pop() noexcept {
         full_slots_.wait();
+        std::optional<T> opt;
         {
             std::scoped_lock lock{mutex_};
 
-            if constexpr (std::is_assignable_v<U, T&&>)
-                item = std::move(data_[pop_index_]);
+            if constexpr (std::is_move_constructible_v<T>)
+                opt.emplace(std::move(data_[pop_index_]));
             else 
-                item = data_[m_popIntex];
+                opt.emplace(data_[m_popIntex]);
 
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
@@ -174,7 +174,7 @@ public:
             if constexpr (std::is_move_constructible_v<T>)
                 opt.emplace(std::move(data_[pop_index_]));
             else 
-                opt.emplace(data_[m_popIntex]);
+                opt.emplace(data_[pop_index_]);
 
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
@@ -300,7 +300,7 @@ public:
         std::optional<T> opt;
         auto popIndex = pop_index_.fetch_add(1, std::memory_order_release);
 
-        if constexpr (std::is_assignable_v<U, T&&>)
+        if constexpr (std::is_move_constructible_v<T>)
             opt.emplace(std::move(data_[popIndex % size_]));
         else
             opt.emplace(data_[popIndex % size_]);
