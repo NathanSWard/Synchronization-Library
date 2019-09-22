@@ -1,8 +1,5 @@
 #pragma once
 
-#include "mutex.hpp"
-#include "semaphore.hpp"
-
 #include <atomic>
 #include <cassert>
 #include <chrono>
@@ -31,7 +28,7 @@ public:
     bool try_push(Args&&... args) {
         {
             std::unique_lock lock{mutex_, std::try_to_lock};
-            if(!lock) 
+            if (!lock) 
                 return false;
             queue_.emplace(std::forward<Args>(args)...);
         }
@@ -39,37 +36,35 @@ public:
         return true;
     }
 
-    template<class U>
     [[nodiscard]] 
-    bool pop(U& item) {
+    std::optional<T> pop(T& item) {
         std::unique_lock lock{mutex_};
-        ready_.wait(lock [this]{return !queue_.empty() || done_});
+        ready_.wait(lock, [this]{return !queue_.empty() || done_;});
         if (queue_.empty()) 
-            return false;
+            return {};
 
-        if constexpr (std::is_assignable_v<U&, T&&>)
-            item = std::move(queue_.front());
+        if constexpr (std::is_move_constructible_v<T>)
+            auto item = std::move(queue_.front());
         else
-            item = queue_.front();
+            auto item = queue_.front();
         
         queue_.pop();
-        return true;
+        return item;
     }
 
-    template<class U>
     [[nodiscard]] 
-    bool try_pop(U& item) {
+    std::optional<T> try_pop() {
         std::unique_lock lock{mutex_, std::try_to_lock};
         if (!lock || queue_.empty()) 
-            return false;
+            return {};
 
-        if constexpr (std::is_assignable_v<U&, T&&>)
-            item = std::move(queue_.front());
+        if constexpr (std::is_move_constructible_v<T>)
+            auto item = std::move(queue_.front());
         else
-            item = queue_.front();
+            auto item = queue_.front();
 
         queue_.pop();
-        return true;
+        return item;
     }
 
     void done() noexcept {
@@ -93,13 +88,16 @@ public:
     }
 
 private:
-    std::queue<std::deque<T, Allocator>>    queue_;
+    std::queue<T, std::deque<T, Allocator>> queue_;
     std::condition_variable                 ready_;
     mutex                                   mutex_;
     bool                                    done_{false};
 };
 
-template<class T, class Allocator = std::allocator<T>>
+template<class T, 
+        class Semaphore,
+        class Mutex,
+        class Allocator = std::allocator<T>>
 class blocking_queue {
 public:
     explicit blocking_queue(unsigned int size)
@@ -108,10 +106,10 @@ public:
         , size_{size}
     {
         assert(size != 0);
-		std::vector<int>;
     }
 
     ~blocking_queue() {
+        std::scoped_lock lock{mutex_};
         while (count_--) {
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
@@ -152,7 +150,7 @@ public:
         {
             std::scoped_lock lock{mutex_};
 
-            if constexpr (std::is_assignable_v<U&, T&&>)
+            if constexpr (std::is_assignable_v<U, T&&>)
                 item = std::move(data_[pop_index_]);
             else 
                 item = data_[m_popIntex];
@@ -164,25 +162,26 @@ public:
         open_slots_.post();
     }
 
-    template<class U>
     [[nodiscard]]
-    bool try_pop(U& item) noexcept {
+    std::optional<T> try_pop() noexcept {
         if (!full_slots_.wait_for(std::chrono::seconds(0))) 
-            return false;
+            return {};
+
+        std::optional<T> opt;
         {
             std::scoped_lock lock{mutex_};
 
-            if constexpr (std::is_assignable_v<U&, T&&>)
-                item = std::move(data_[pop_index_]);
+            if constexpr (std::is_move_constructible_v<T>)
+                opt.emplace(std::move(data_[pop_index_]));
             else 
-                item = data_[m_popIntex];
+                opt.emplace(data_[m_popIntex]);
 
             data_[pop_index_].~T();
             pop_index_ = ++pop_index_ % size_;
             --count_;
         }
         open_slots_.post();
-        return true;
+        return opt;
     }
 
     [[nodiscard]]
@@ -209,9 +208,9 @@ public:
     }
 
 private:
-    fast_semaphore      open_slots_;
-    fast_semaphore      full_slots_{0};
-    fast_mutex          mutex_;
+    Semaphore           open_slots_;
+    Semaphore           full_slots_{0};
+    Mutex               mutex_;
     T*                  data_;
     unsigned int const  size_;
     unsigned int        push_index_{0};
@@ -219,7 +218,9 @@ private:
     unsigned int        count_{0};
 };
 
-template<class T, class Allocator = std::allocator<T>>
+template<class T, 
+        class Semaphore,
+        class Allocator = std::allocator<T>>
 class lock_free_queue {
 public:
     explicit lock_free_queue(unsigned int size)
@@ -269,16 +270,16 @@ public:
         return true;
     }
 
-    template<class U>
-    void pop(U& item) noexcept {
+    [[nodiscard]]
+    T pop() noexcept {
         full_slots_.wait();
 
         auto popIndex = pop_index_.fetch_add(1, std::memory_order_release);
 
-        if constexpr (std::is_assignable_v<U&, T&&>)
-            item = std::move(data_[popIndex % size_])
+        if constexpr (std::is_move_constructible_v<T>)
+            auto item = std::move(data_[popIndex % size_])
         else
-            item = data_[popIndex % size_];
+            auto item = data_[popIndex % size_];
 
         data_[popIndex % size_].~T();
         count_.fetch_sub(1, std::memory_order_relaxed);
@@ -288,20 +289,21 @@ public:
             expected = pop_index_.load(std::memory_order_acquire);
 
         open_slots_.post();
+        return item;
     }
 
-    template<class U>
     [[nodiscard]]
-    bool try_pop(U& item) noexcept {
+    std::optional<T> try_pop() noexcept {
 		if (!full_slots_.wait_for(std::chrono::seconds{0}))
             return false;
 
+        std::optional<T> opt;
         auto popIndex = pop_index_.fetch_add(1, std::memory_order_release);
 
-        if constexpr (std::is_assignable_v<U&, T&&>)
-            item = std::move(data_[popIndex % size_])
+        if constexpr (std::is_assignable_v<U, T&&>)
+            opt.emplace(std::move(data_[popIndex % size_]));
         else
-            item = data_[popIndex % size_];
+            opt.emplace(data_[popIndex % size_]);
 
         data_[popIndex % size_].~T();
         count_.fetch_sub(1, std::memory_order_relaxed);
@@ -335,8 +337,8 @@ public:
     }
 
 private:
-    fast_semaphore      open_slots_;
-    fast_semaphore      full_slots_{0};
+    Semaphore           open_slots_;
+    Semaphore           full_slots_{0};
     T*                  data_;
     std::atomic_uint    push_index_{0};
     std::atomic_uint    pop_index_{0};
