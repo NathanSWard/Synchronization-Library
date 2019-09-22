@@ -1,8 +1,9 @@
 #pragma once
 
 #include <chrono>
-#include "platform.hpp"
-#include "types.hpp"
+#include "include/assert.hpp"
+#include "include/platform.hpp"
+#include "include/types.hpp"
 
 #if SYNC_MAC || SYNC_LINUX
     #include <errno.h>
@@ -28,12 +29,12 @@ void initialize_thread(sync_thread_t& t, void*(*f)(void*), void* args) {
 }
 
 void join_thread(sync_thread_t& t) {
-    (void)WaitForSingleObject(t, INFINITE);
-    (void)CloseHandle(t);
+    SYNC_ASSERT(WaitForSingleObject(t, INFINITE) != WAIT_FAILED, "WaitForSingleObject failed");
+    SYNC_WINDOWS_ASSERT(CloseHandle(t), "CloseHandle for joined thread failed");
 }
 
 void detach_thread(sync_thread_t&) {
-    (void)CloseHandle(t);
+    SYNC_WINDOWS_ASSERT(CloseHandle(t), "CloseHandle for detached thread failed");
 }
 
 void yeild_thread() {

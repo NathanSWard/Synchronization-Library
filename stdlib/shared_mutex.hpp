@@ -41,12 +41,10 @@ public:
     shared_mutex(shared_mutex const&) = delete;
     shared_mutex& operator=(shared_mutex const&) = delete;
 
-    // Exclusive ownership
     void lock() { base_.lock(); }
     bool try_lock() { return base_.try_lock(); }
     void unlock() { base_.unlock(); }
 
-    // Shared ownership
     void lock_shared() { base_.lock_shared(); }
     bool try_lock_shared() { base_.try_lock_shared(); }
     void unlock_shared() { base_.unlock_shared(); }
@@ -63,7 +61,6 @@ public:
     shared_timed_mutex(const shared_timed_mutex&) = delete;
     shared_timed_mutex& operator=(const shared_timed_mutex&) = delete;
 
-    // Exclusive ownership
     void lock();
     bool try_lock();
     template <class Rep, class Period>
@@ -75,7 +72,6 @@ public:
     bool try_lock_until(const std::chrono::time_point<Clock, Duration>& abs_time);
     void unlock();
 
-    // Shared ownership
     void lock_shared();
     bool try_lock_shared();
     template <class Rep, class Period>

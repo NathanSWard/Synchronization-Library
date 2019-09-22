@@ -136,17 +136,19 @@ public:
     }
 
     bool try_lock() {
-        mtx_->try_lock();
+        return mtx_->try_lock();
     }
 
     template<class Rep, class Period>
     bool try_lock_for(std::chrono::duration<Rep,Period> const& timeout_duration) {
         owns_ = mtx_->try_lock_for(timeout_duration);
+        return owns_;
     }
 
     template<class Clock, class Duration>
     bool try_lock_until(std::chrono::time_point<Clock,Duration> const& timeout_time) {
         owns_ = mtx_->try_lock_until(timeout_time);
+        return owns_;
     }
 
     void unlock() {

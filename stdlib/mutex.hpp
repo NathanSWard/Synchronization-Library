@@ -136,6 +136,7 @@ public:
     }
 	
     void unlock() {
+        SYNC_ASSERT(locked_, "recursive_timed_mutex::unlock trying to unlock an unlocked mutex");
         release_mutex(mtx_);
         locked_ = false;
     }

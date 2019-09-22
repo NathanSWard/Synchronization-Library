@@ -45,7 +45,7 @@ namespace sync {
 
     // reader writer mutex
     void initialize_mutex(sync_rw_mtx_t& mtx) {
-        InitializeSRWLock(&mtx.)
+        InitializeSRWLock(&mtx)
     }
 
     void destroy_mutex(sync_rw_mtx_t&) {}
@@ -59,11 +59,11 @@ namespace sync {
     }
 
     bool try_acquire_mutex_wr(sync_rw_mtx_t& mtx) {
-        TryAcquireSRWLockExclusive(&mtx);
+        return TryAcquireSRWLockExclusive(&mtx);
     }
 
     bool try_acquire_mutex_rd(sync_rw_mtx_t& mtx) {
-        TryAcquireSRWLockShared(&mtx);
+        return TryAcquireSRWLockShared(&mtx);
     }
 
     void release_mutex_wr(sync_rw_mtx_t& mtx) {
