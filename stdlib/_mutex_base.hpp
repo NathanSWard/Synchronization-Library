@@ -1,7 +1,9 @@
+// _mutex_base.hpp
 #pragma once
 
-#include "internal/cv.hpp"
-#include "internal/mtx.hpp"
+#include "internal/sync_cond.hpp"
+#include "internal/sync_mutex.hpp"
+
 #include <utility>
 
 namespace sync {
@@ -10,27 +12,27 @@ namespace sync {
 class mutex {
 public:
     /*constexpr*/ mutex() {
-        initialize_mutex(mtx_);
+        sync_mutex_init(mtx_);
     }
 
     mutex(mutex const&) = delete;
 
     ~mutex() {
-        destroy_mutex(mtx_);
+        sync_mutex_destroy(mtx_);
     }
 
     mutex& operator=(mutex const&) = delete;
 
     void lock() {
-        acquire_mutex(mtx_);
+        sync_mutex_lock(mtx_);
     }
 
     bool try_lock() {
-        return try_acquire_mutex(mtx_);
+        return sync_mutex_trylock(mtx_);
     }
 
     void unlock() {
-        release_mutex(mtx_);
+        sync_mutex_unlock(mtx_);
     }
 
     auto native_handle() {
@@ -38,7 +40,7 @@ public:
     }
 
 private:
-    sync_mtx_t mtx_;
+    sync_mutex_t mtx_;
 };
 
 // lock types
@@ -200,21 +202,21 @@ enum class cv_status {
 class condition_variable {
 public:
     condition_variable() {
-        initialize_cv(cv_);
+        sync_cond_init(cv_);
     }
 
     condition_variable(condition_variable const&) = delete;
 
     void notify_one() noexcept {
-        signal_cv(cv_);
+        sync_cond_signal(cv_);
     }
 
     void notify_all() noexcept {
-        broadcast_cv(cv_);
+        sync_cond_broadcast(cv_);
     }
 
     void wait(unique_lock<mutex>& lock) {
-        wait_cv(cv_, *lock.mutex()->native_handle());
+        sync_cond_wait(cv_, *lock.mutex()->native_handle());
     }
 
     template<class Predicate>
@@ -234,9 +236,9 @@ public:
         std::chrono::steady_clock::time_point c_now{std::chrono::steady_clock::now()};
         std::chrono::system_clock::time_point s_now{std::chrono::system_clock::now()};
         if (max - dur > s_now)
-            timed_wait_cv(cv_, *lock.mutex()->native_handle(), s_now + std::chrono::ceil<std::chrono::nanoseconds>(dur));
+            timed_sync_cond_wait(cv_, *lock.mutex()->native_handle(), s_now + std::chrono::ceil<std::chrono::nanoseconds>(dur));
         else
-            timed_wait_cv(cv_, *lock.mutex()->native_handle(), sys_tpi::max());
+            timed_sync_cond_wait(cv_, *lock.mutex()->native_handle(), sys_tpi::max());
         
         return std::chrono::steady_clock::now() - c_now < dur ? cv_status::no_timeout : cv_status::timeout;
     }
@@ -272,7 +274,7 @@ public:
     }
 
     private:
-        sync_cv_t cv_;
+        sync_cond_t cv_;
 };
 
 }

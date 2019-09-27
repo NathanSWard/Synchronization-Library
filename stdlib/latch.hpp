@@ -1,22 +1,25 @@
+// latch.hpp
 #pragma once
 
+#include "condition_variable.hpp"
+#include "mutex.hpp"
+
 #include <atomic>
-#include "stdlib/condition_variable.hpp"
-#include "stdlib/mutex.hpp"
 
 namespace sync {
 
 class latch {
 public:
-    explicit latch(std::ptrdiff_t n) noexcept
+    explicit latch(std::ptrdiff_t n)
         : count_{n}
     {}
 
     latch(latch const&) = delete;
+    latch& operator=(latch const&) = delete;
 
-    void count_down_and_wait() noexcept {
+    void count_down_and_wait() {
         if (count_.fetch_sub(1, std::memory_order_acquire) == 0) {
-            cv_.notify_all;
+            cv_.notify_all();
             return;
         }
         
@@ -24,15 +27,16 @@ public:
         cv_.wait(lock, [&]{return is_ready();});
     }
 
-    void count_down(std::ptrdiff_t n = 1) noexcept {
+    void count_down(std::ptrdiff_t n = 1) {
         count_.fetch_sub(1, std::memory_order_release);
     }
     
+    [[nodiscard]]
     bool is_ready() const noexcept {
         return count_.load(std::memory_order_acquire) == 0;
     }
 
-    void wait() const noexcept {
+    void wait() const {
         if (is_ready())
             return;
 

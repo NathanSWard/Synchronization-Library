@@ -1,4 +1,5 @@
 // shared_mutex.hpp
+#pragma once
 
 #include "condition_variable.hpp"
 #include "include/assert.hpp"

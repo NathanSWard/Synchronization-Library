@@ -1,6 +1,7 @@
+// thread.hpp
 #pragma once
 
-#include "internal/thread.hpp"
+#include "internal/sync_thread.hpp"
 
 #include <exception>
 #include <functional>
@@ -58,7 +59,7 @@ public:
         std::unique_ptr<Tup> ptr{
             std::make_unique<Tup>(decay_copy(std::forward<Fn>(f)), 
                                   decay_copy(std::forward<Args>(args))...)};
-        initialize_thread(handle_, &void_callable<Tup>, static_cast<void*>(ptr.release()));
+        sync_thread_create(handle_, &void_callable<Tup>, static_cast<void*>(ptr.release()));
     }
 
     ~thread() {
@@ -68,11 +69,11 @@ public:
 
     // Observers
     bool joinable() const noexcept {
-        return !is_thread_null(handle_);
+        return !sync_thread_is_null(handle_);
     }
 
     id get_id() const noexcept {
-        return get_thread_id(handle_);
+        return sync_thread_id(handle_);
     }
 
     native_handle_type native_handle() {
@@ -80,18 +81,18 @@ public:
     }
 
     static unsigned int hardward_concurrency() noexcept {
-        return get_concurrency();
+        return sync_thread_getconcurrency();
     } 
 
     // Operations
     void join() {
         SYNC_ASSERT(!joinable(), "thread::join, trying to join an unjoinable thread");
-        join_thread(handle_);
+        sync_thread_join(handle_);
     }
 
     void detach() {
         SYNC_ASSERT(!joinable(), "thread::join, trying to detach an unjoinable thread");
-        detach_thread(handle_);
+        sync_thread_detach(handle_);
     }
 
     void swap(thread& other) noexcept {
@@ -108,21 +109,21 @@ inline void swap(thread& x, thread& y) noexcept {
 
 namespace this_thread {
     void yield() noexcept {
-        yeild_thread();
+        sync_thread_yield();
     }
 
     thread::id get_id() noexcept {
-        return get_curr_thread_id();
+        return sync_thread_curr_id();
     }
 
     template<class Rep, class Period>
     void sleep_for(std::chrono::duration<Rep, Period> const& sleep_duration) {
-        thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration));
+        sync_thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration));
     }
 
     template<class Clock, class Duration>
     void sleep_until(std::chrono::time_point<Clock, Duration> const& sleep_time) {
-        sleep_for(sleep_time - Clock::now());
+        sync_thread_sleep_for(sleep_time - Clock::now());
     }
 }
 
@@ -134,4 +135,4 @@ class stop_callback
 class jthread;
 */
 
-}
+} // namespace sync

@@ -1,10 +1,12 @@
+// mutex_extra.hpp
 #pragma once
 
-#include <atomic>
 #include "event.hpp"
-#include "stdlib/internal/mtx.hpp"
 #include "semaphore.hpp"
+#include "stdlib/internal/sync_mutex.hpp"
 #include "stdlib/thread.hpp"
+
+#include <atomic>
 
 namespace sync {
 
@@ -85,11 +87,12 @@ public:
         }
     }
 
+    [[nodiscard]]
     bool try_lock() {
         if (!wrmtx_.try_lock())
             return false;
         long const count{rdcount_.fetch_sub(LONG_MAX, std::memory_order_acquire)};
-        if (cout < LONG_MAX) {
+        if (count < LONG_MAX) {
             long const rdwait{rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire)};
             if (!(rdwait + LONG_MAX - count))
                 return true;
@@ -113,37 +116,48 @@ private:
     std::atomic_long 	rdwait_{0};	
 };
 
+namespace os {
+
 class rw_mutex {
-    public:
-        rw_mutex() {
-            initialize_mutex(mtx_);
-        }
+public:
+    rw_mutex() {
+        sync_rwlock_init(mtx_);
+    }
 
-        void lock() {
-            acquire_mutex_wr(mtx_);
-        }
+    ~rw_mutex() {
+        sync_rwlock_destroy(mtx_);
+    }
 
-        bool try_lock() {
-            try_acquire_mutex_wr(mtx_);
-        }
-        
-        void unlock() {
-            release_mutex_wr(mtx_);
-        }
+    void lock() {
+        sync_rwlock_wrlock(mtx_);
+    }
+
+    [[nodiscard]]
+    bool try_lock() {
+        sync_rwlock_trywrlock(mtx_);
+    }
     
-        void lock_shared() {
-            acquire_mutex_rd(mtx_);
-        }
+    void unlock() {
+        sync_rwlock_wrunlock(mtx_);
+    }
 
-        bool try_lock_shared() {
-            try_acquire_mutex_rd(mtx_);
-        }
-        
-        void unlock_shared() {
-            release_mutex_rd(mtx_);
-        }
-        
-    private:
-        sync_rw_mutex_t mtx_{};
+    void lock_shared() {
+        sync_rwlock_rdlock(mtx_);
+    }
+
+    [[nodiscard]]
+    bool try_lock_shared() {
+        sync_rwlock_tryrdlock(mtx_);
+    }
+    
+    void unlock_shared() {
+        sync_rwlock_rdunlock(mtx_);
+    }
+    
+private:
+    sync_rwlock_t mtx_{};
 };
-}
+
+} // namespace os
+
+} // namespace sync

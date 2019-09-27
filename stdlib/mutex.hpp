@@ -1,6 +1,8 @@
+// mutex.hpp
 #pragma once
 
 #include "_mutex_base.hpp"
+
 #include <atomic>
 #include <thread>
 #include <tuple>
@@ -13,27 +15,26 @@ namespace sync {
 class recursive_mutex {
 public:
     recursive_mutex() {
-        initialize_mutex(mtx_);
+        sync_mutex_init(mtx_);
     }
 
     recursive_mutex(recursive_mutex const&) = delete;
-
-    ~recursive_mutex() {
-        destroy_mutex(mtx_);
-    }
-
     recursive_mutex& operator=(recursive_mutex const&) = delete;
 
+    ~recursive_mutex() {
+        sync_mutex_destroy(mtx_);
+    }
+
     void lock() {
-        acquire_mutex(mtx_);
+        sync_mutex_lock(mtx_);
     }
 
     bool try_lock() {
-        return try_acquire_mutex(mtx_);
+        return sync_mutex_trylock(mtx_);
     }
 
     void unlock() {
-        release_mutex(mtx_);
+        sync_mutex_unlock(mtx_);
     }
 
     auto native_handle() {
@@ -41,27 +42,27 @@ public:
     }
 
 private:
-    sync_mtx_t mtx_ = SYNC_RECURSIVE_MTX_INIT;
+    sync_mutex_t mtx_ = SYNC_RECURSIVE_MUTEX_INIT;
 };
 
 class timed_mutex {
 public:
     timed_mutex() {
-        initialize_mutex(mtx_);
+        sync_mutex_init(mtx_);
     }
 
     timed_mutex(timed_mutex const&) = delete;
 
     ~timed_mutex() {
-        destroy_mutex(mtx_);
+        sync_mutex_destroy(mtx_);
     }
 
     void lock() {
-        acquire_mutex(mtx_);
+        sync_mutex_lock(mtx_);
     }
 
     bool try_lock() {
-        return try_acquire_mutex(mtx_);
+        return sync_mutex_trylock(mtx_);
     }
 
     template<class Rep, class Period>
@@ -83,7 +84,7 @@ public:
     }
 	
     void unlock() {
-        release_mutex(mtx_);
+        sync_mutex_unlock(mtx_);
         locked_ = false;
     }
 
@@ -92,7 +93,7 @@ public:
     }
 
 private:
-    sync_mtx_t          mtx_;
+    sync_mutex_t        mtx_;
     condition_variable  cv_;
     bool                locked_{false};
 };
@@ -100,21 +101,21 @@ private:
 class recursive_timed_mutex {
 public:
     recursive_timed_mutex() {
-        initialize_mutex(mtx_);
+        sync_mutex_init(mtx_);
     }
 
     recursive_timed_mutex(timed_mutex const&) = delete;
 
     ~recursive_timed_mutex() {
-        destroy_mutex(mtx_);
+        sync_mutex_destroy(mtx_);
     }
 
     void lock() {
-        acquire_mutex(mtx_);
+        sync_mutex_lock(mtx_);
     }
 
     bool try_lock() {
-        return try_acquire_mutex(mtx_);
+        return sync_mutex_trylock(mtx_);
     }
 
     template<class Rep, class Period>
@@ -137,7 +138,7 @@ public:
 	
     void unlock() {
         SYNC_ASSERT(locked_, "recursive_timed_mutex::unlock trying to unlock an unlocked mutex");
-        release_mutex(mtx_);
+        sync_mutex_unlock(mtx_);
         locked_ = false;
     }
 
@@ -146,7 +147,7 @@ public:
     }
 
 private:
-    sync_mtx_t          mtx_ = SYNC_RECURSIVE_MTX_INIT;
+    sync_mutex_t        mtx_ = SYNC_RECURSIVE_MUTEX_INIT;
     condition_variable  cv_;
     bool                locked_{false};   
 };

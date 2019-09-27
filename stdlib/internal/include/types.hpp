@@ -1,3 +1,4 @@
+// types.hpp
 #pragma once
 
 #include "platform.hpp"
@@ -13,13 +14,16 @@ using sync_thread_id_t = DWORD;
 #define SYNC_NULL_THREAD nullptr
 
 // mutex types
-using sync_mtx_t = CRITICAL_SECTION;
-using sync_rw_mtx_t = SRWLock;
+using sync_mutex_t = CRITICAL_SECTION;
+using sync_rwlock_t = SRWLock;
 
 #define SYNC_RECURSIVE_MTX_INIT {}
 
 // condition variable
-using sync_cv_t = CONDITION_VARIABLE;
+using sync_cond_t = CONDITION_VARIABLE;
+
+// barrier
+using sync_barrier_t = SYNCHRONIZATION_BARRIER;
 
 #elif SYNC_MAC || SYNC_LINUX
 
@@ -31,16 +35,19 @@ using sync_thread_id_t = pthread_t;
 #define SYNC_NULL_THREAD 0
 
 // mutex types
-using sync_mtx_t = pthread_mutex_t;
-using sync_rw_mtx_t = pthread_rwlock_t;
+using sync_mutex_t = pthread_mutex_t;
+using sync_rwlock_t = pthread_rwlock_t;
 
 #if SYNC_MAC
-    #define SYNC_RECURSIVE_MTX_INIT PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+    #define SYNC_RECURSIVE_MUTEX_INIT PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
 #elif SYNC_LINUX
-    #define SYNC_RECURSIVE_MTX_INIT PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+    #define SYNC_RECURSIVE_MUTEX_INIT PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #endif
 
 // condition variable
-using sync_cv_t = pthread_cond_t;
+using sync_cond_t = pthread_cond_t;
+
+// barrier
+using sync_barrier_t = pthread_barrier_t;
 
 #endif
