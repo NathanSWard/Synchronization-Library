@@ -12,7 +12,6 @@ template<template<class> class Queue>
 class simple_thread_pool {
 public:
     explicit simple_thread_pool(unsigned int num_threads_) {
-        assert(num_threads_ != 0);
         threads_.reserve(num_threads_);
 
         for (unsigned int i = 0; i < num_threads_; ++i)
@@ -50,7 +49,7 @@ public:
             }
         );
         auto result = task->get_future();
-        queue_.push([task = std::move(task)] { task->(); });
+        queue_.push([task = std::move(task)] { (*task)(); });
         return result;
     }
 
@@ -70,12 +69,11 @@ public:
         : queues_{num_threads}
         , count_{num_threads}
     {
-        assert(num_threads != 0);
         auto work = [this](unsigned int i) {
             for (;;) {
                 std::optional<Proc> proc;
                 for (unsigned int n = 0; n < count_; ++n)
-                    if(proc = queues_[(i + n) % count_].try_pop()) 
+                    if((proc = queues_[(i + n) % count_].try_pop())) 
                         break;
                 if (!proc && !(proc = queues_[i].pop())) 
                     break;
@@ -99,7 +97,7 @@ public:
         };
         unsigned int const i = index_.fetch_add(1, std::memory_order_relaxed);
         for (unsigned int n = 0; n < count_ * LOOP_K; ++n)
-            if (queues_[(i + n) % count_].try_push(std::move(work)) 
+            if (queues_[(i + n) % count_].try_push(std::move(work))) 
                 return;
         queues_[i % count_].push(std::move(work));
     }
@@ -110,7 +108,7 @@ public:
         auto task = std::make_unique<std::packaged_task<return_t()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
         auto result = task->get_future();
 
-        auto work = [task = std::move(task)] { task->(); };
+        auto work = [task = std::move(task)] { (*task)(); };
         unsigned int const i = index_.fetch_add(1, std::memory_order_relaxed);
         for(unsigned int n = 0; n < count_ * LOOP_K; ++n)
             if(queues_[(i + n) % count_].try_push(std::move(work))) 
