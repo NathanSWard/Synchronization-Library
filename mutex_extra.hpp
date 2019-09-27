@@ -7,6 +7,7 @@
 #include "stdlib/thread.hpp"
 
 #include <atomic>
+#include <limits>
 
 namespace sync {
 
@@ -79,10 +80,10 @@ public:
     
     void lock() noexcept {
         wrmtx_.lock();
-        long const count{rdcount_.fetch_sub(LONG_MAX, std::memory_order_acquire)};
-        if (count < LONG_MAX) {
-            long const rdwait{rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire)};
-            if (rdwait + LONG_MAX - count)
+        long const count{rdcount_.fetch_sub(std::numeric_limits<long>::max(), std::memory_order_acquire)};
+        if (count < std::numeric_limits<long>::max()) {
+            long const rdwait{rdwait_.fetch_add(std::numeric_limits<long>::max() - count, std::memory_order_acquire)};
+            if (rdwait + std::numeric_limits<long>::max() - count)
                 wrsem_.wait();
         }
     }
@@ -91,18 +92,18 @@ public:
     bool try_lock() {
         if (!wrmtx_.try_lock())
             return false;
-        long const count{rdcount_.fetch_sub(LONG_MAX, std::memory_order_acquire)};
-        if (count < LONG_MAX) {
-            long const rdwait{rdwait_.fetch_add(LONG_MAX - count, std::memory_order_acquire)};
-            if (!(rdwait + LONG_MAX - count))
+        long const count{rdcount_.fetch_sub(std::numeric_limits<long>::max(), std::memory_order_acquire)};
+        if (count < std::numeric_limits<long>::max()) {
+            long const rdwait{rdwait_.fetch_add(std::numeric_limits<long>::max() - count, std::memory_order_acquire)};
+            if (!(rdwait + std::numeric_limits<long>::max() - count))
                 return true;
         }
-        rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
+        rdcount_.fetch_add(std::numeric_limits<long>::max(), std::memory_order_release);
         return false;
     }
     
     void unlock() noexcept {
-        int const count = rdcount_.fetch_add(LONG_MAX, std::memory_order_release);
+        int const count = rdcount_.fetch_add(std::numeric_limits<long>::max(), std::memory_order_release);
         if (count < 0)
             rdsem_.post(-count);
         wrmtx_.unlock();
@@ -112,7 +113,7 @@ private:
     semaphore       	wrsem_{0};
     semaphore       	rdsem_{0};
     fast_mutex          wrmtx_;
-    std::atomic_long 	rdcount_{LONG_MAX};
+    std::atomic_long 	rdcount_{std::numeric_limits<long>::max()};
     std::atomic_long 	rdwait_{0};	
 };
 
