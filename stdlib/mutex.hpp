@@ -186,18 +186,16 @@ template<class M0, class M1>
 void lock(M0& m0, M1& m1) {
     for (;;) {
         {
-            unique_lock lock(m0);
-            if (m1.try_lock())
-            {
+            unique_lock lock{m0};
+            if (m1.try_lock()) {
                 lock.release();
                 break;
             }
         }
         this_thread::yield();
         {
-            unique_lock lock(m1);
-            if (m0.try_lock())
-            {
+            unique_lock lock{m1};
+            if (m0.try_lock()) {
                 lock.release();
                 break;
             }
@@ -212,7 +210,7 @@ void _lock_first(int i, M0& m0, M1& m1, M2& m2, MN& ...mn) {
         switch (i) {
             case 0:
                 {
-                    unique_lock lock(m0);
+                    unique_lock lock{m0};
                     i = try_lock(m1, m2, mn...);
                     if (i == -1) {
                         lock.release();
@@ -224,7 +222,7 @@ void _lock_first(int i, M0& m0, M1& m1, M2& m2, MN& ...mn) {
                 break;
             case 1:
                 {
-                    unique_lock lock(m1);
+                    unique_lock lock{m1};
                     i = try_lock(m2, mn..., m0);
                     if (i == -1) {
                         lock.release();
