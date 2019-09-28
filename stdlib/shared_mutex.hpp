@@ -11,7 +11,7 @@ struct shared_mutex_base {
     mutex               mtx_;
     condition_variable  gate1_;
     condition_variable  gate2_;
-    unsigned            state_;
+    unsigned            state_{0};
 
     static constexpr unsigned write_entered_ = 1U << (sizeof(unsigned)*__CHAR_BIT__ - 1);
     static constexpr unsigned n_readers_ = ~write_entered_;
@@ -23,14 +23,67 @@ struct shared_mutex_base {
     shared_mutex_base& operator=(shared_mutex_base const&) = delete;
 
     // Exclusive ownership
-    void lock(); // blocking
-    bool try_lock();
-    void unlock();
+    void lock() {
+        unique_lock lock{mtx_};
+        while (state_ & write_entered_)
+            gate1_.wait(lock);
+        state_ |= write_entered_;
+        while (state_ & n_readers_)
+            gate2_.wait(lock);
+    }
+
+    bool try_lock() {
+        unique_lock lock{mtx_};
+        if (state_ == 0) {
+            state_ = write_entered_;
+            return true;
+        }
+        return false;
+    }
+
+    void unlock() {
+        scoped_lock lock{mtx_};
+        state_ = 0;
+        gate1_.notify_all();
+    }
 
     // Shared ownership
-    void lock_shared(); // blocking
-    bool try_lock_shared();
-    void unlock_shared();
+    void lock_shared() {
+        unique_lock lock{mtx_};
+        while ((state_ & write_entered_) || (state_ & n_readers_) == n_readers_)
+            gate1_.wait;
+        unsigned readers = (state_ & n_readers_) + 1;
+        state_ &= ~n_readers_;
+        state_ |= readers;
+    }
+    
+    bool try_lock_shared() {
+        unique_lock lock{mtx_};
+        unsigned readers = state_ & n_readers_;
+        if (!(state_ & write_entered_) && readers != n_readers_) {
+            ++readers;
+            state_ &= ~n_readers_;
+            state_ |= readers;
+            return true;
+        }
+        return false;
+    }
+    
+    void unlock_shared() {
+        scoped_lock lock{mtx_};
+        unsigned readers = (state_ & n_readers_) - 1;
+        state_ &= ~n_readers_;
+        state_ |= readers;
+        if (state_ & write_entered_) {
+            if (readers == 0)
+                gate2_.notify_one();
+        }
+        else {
+            if (readers == n_readers_ - 1)
+                gate1_.notify_one();
+        }
+
+    }
 };
 
 class shared_mutex {
@@ -259,4 +312,4 @@ inline void swap(shared_lock<Mutex>& a, shared_lock<Mutex>& b) noexcept {
     a.swap(b);
 }
 
-}
+} // namespace sync
