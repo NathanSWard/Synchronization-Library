@@ -28,7 +28,9 @@ private:
 class flex_barrier {
 public:
     template<class Fn>
-    flex_barrier(unsigned int count, Fn completion) {
+    flex_barrier(unsigned int count, Fn completion) 
+        : compl_{completion}
+    {
         sync_barrier_init(bar_, count);
     }
 
