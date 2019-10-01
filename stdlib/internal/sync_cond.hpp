@@ -92,7 +92,7 @@ void sync_cond_broadcast(sync_cond_t&);
             ts.tv_sec = ts_sec_max;
             ts.tv_nsec = std::giga::num - 1;
         }
-        SYNC_POSIX_ASSERT(pthead_cond_timedwait(&cv, &mtx, &ts), "pthread_cond_timedwait failed");
+        (void)pthread_cond_timedwait(&cv, &mtx, &ts);
     }
 
     void sync_cond_signal(sync_cond_t& cv) {
