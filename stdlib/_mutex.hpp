@@ -236,9 +236,9 @@ public:
         std::chrono::steady_clock::time_point c_now{std::chrono::steady_clock::now()};
         std::chrono::system_clock::time_point s_now{std::chrono::system_clock::now()};
         if (max - dur > s_now)
-            timed_sync_cond_wait(cv_, *lock.mutex()->native_handle(), s_now + std::chrono::ceil<std::chrono::nanoseconds>(dur));
+            sync_cond_timedwait(cv_, *lock.mutex()->native_handle(), s_now + std::chrono::ceil<std::chrono::nanoseconds>(dur));
         else
-            timed_sync_cond_wait(cv_, *lock.mutex()->native_handle(), sys_tpi::max());
+            sync_cond_timedwait(cv_, *lock.mutex()->native_handle(), sys_tpi::max());
         
         return std::chrono::steady_clock::now() - c_now < dur ? cv_status::no_timeout : cv_status::timeout;
     }
