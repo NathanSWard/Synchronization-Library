@@ -2,8 +2,11 @@
 #pragma once
 
 #include "_mutex.hpp"
+#include "thread.hpp"
 
 #include <atomic>
+#include <chrono>
+#include <limits>
 #include <thread>
 #include <tuple>
 #include <utility>
@@ -14,9 +17,7 @@ namespace sync {
 
 class recursive_mutex {
 public:
-    recursive_mutex() {
-        sync_mutex_init(mtx_);
-    }
+    recursive_mutex() = default;
 
     recursive_mutex(recursive_mutex const&) = delete;
     recursive_mutex& operator=(recursive_mutex const&) = delete;
@@ -47,22 +48,29 @@ private:
 
 class timed_mutex {
 public:
-    timed_mutex() {
-        sync_mutex_init(mtx_);
-    }
+    timed_mutex() = default;
 
     timed_mutex(timed_mutex const&) = delete;
+    timed_mutex& operator=(timed_mutex const&) = delete;
 
     ~timed_mutex() {
-        sync_mutex_destroy(mtx_);
+        lock_guard lock{mtx_};
     }
 
     void lock() {
-        sync_mutex_lock(mtx_);
+        unique_lock lock{mtx_};
+        while (locked_)
+            cv_.wait(lock);
+        locked_ = true;
     }
 
     bool try_lock() {
-        return sync_mutex_trylock(mtx_);
+        unique_lock lock{mtx_, try_to_lock};
+        if (lock.owns_lock() && !locked_) {
+            locked_ = true;
+            return true;
+        }
+        return false;
     }
 
     template<class Rep, class Period>
@@ -71,7 +79,7 @@ public:
     }
 
     template<class Clock, class Duration>
-    bool try_lock_until(std::chrono::time_point<Clock,Duration> const& time) {
+    bool try_lock_until(std::chrono::time_point<Clock, Duration> const& time) {
         unique_lock lock{mtx_};
         bool no_timeout{Clock::now() < time};
         while (no_timeout && locked_)
@@ -84,38 +92,58 @@ public:
     }
 	
     void unlock() {
-        sync_mutex_unlock(mtx_);
+        lock_guard lock{mtx_};
         locked_ = false;
+        cv_.notify_one();
     }
 
     auto native_handle() {
-        return &mtx_;
+        return mtx_.native_handle();
     }
 
 private:
-    sync_mutex_t        mtx_;
+    mutex               mtx_;
     condition_variable  cv_;
     bool                locked_{false};
 };
 
 class recursive_timed_mutex {
 public:
-    recursive_timed_mutex() {
-        sync_mutex_init(mtx_);
+    recursive_timed_mutex() = default;
+
+    ~recursive_timed_mutex() {
+        lock_guard lock{mtx_};
     }
 
     recursive_timed_mutex(timed_mutex const&) = delete;
-
-    ~recursive_timed_mutex() {
-        sync_mutex_destroy(mtx_);
-    }
+    recursive_timed_mutex& operator=(timed_mutex const&) = delete;
 
     void lock() {
-        sync_mutex_lock(mtx_);
+        auto id = this_thread::get_id();
+        unique_lock lock{mtx_};
+        if (id == id_) {
+            if (count_ == std::numeric_limits<std::size_t>::max())
+                SYNC_ASSERT(false, "recursive_timed_mutex lock limit reached");
+            ++count_;
+            return;
+        }
+        while (count_ != 0)
+            cv_.wait(lock);
+        count_ = 1;
+        id_ = id;
     }
 
-    bool try_lock() {
-        return sync_mutex_trylock(mtx_);
+    bool try_lock() noexcept {
+        auto id = this_thread::get_id();
+        unique_lock lock{mtx_, try_to_lock};
+        if (lock.owns_lock() && (count_ == 0 || id == id_)) {
+            if (count_ == std::numeric_limits<std::size_t>::max())
+                return false;
+            ++count_;
+            id_ = id;
+            return true;
+        }
+        return false;
     }
 
     template<class Rep, class Period>
@@ -125,21 +153,33 @@ public:
 
     template<class Clock, class Duration>
     bool try_lock_until(std::chrono::time_point<Clock,Duration> const& time) {
+        using namespace std::chrono;
+        auto id = this_thread::get_id();
         unique_lock lock{mtx_};
-        bool no_timeout{Clock::now() < time};
-        while (no_timeout && locked_)
+        if (id == id_) {
+            if (count_ == std::numeric_limits<std::size_t>::max())
+                return false;
+            ++count_;
+            return true;
+        }
+        bool no_timeout = Clock::now() < time;
+        while (no_timeout && count_ != 0)
             no_timeout = cv_.wait_until(lock, time) == cv_status::no_timeout;
-        if (!locked_) {
-            locked_ = true;
+        if (count_ == 0) {
+            count_ = 1;
+            id_ = id;
             return true;
         }
         return false;
     }
 	
     void unlock() {
-        SYNC_ASSERT(locked_, "recursive_timed_mutex::unlock trying to unlock an unlocked mutex");
-        sync_mutex_unlock(mtx_);
-        locked_ = false;
+        unique_lock lock{mtx_};
+        if (--count_ == 0) {
+            id_ = SYNC_NULL_THREAD;
+            lock.unlock();
+            cv_.notify_one();
+        }
     }
 
     auto native_handle() {
@@ -147,9 +187,10 @@ public:
     }
 
 private:
-    sync_mutex_t        mtx_ = SYNC_RECURSIVE_MUTEX_INIT;
+    mutex               mtx_;
     condition_variable  cv_;
-    bool                locked_{false};   
+    std::size_t         count_{0};
+    sync_thread_id_t    id_{}; 
 };
 
 // locking functions
@@ -338,11 +379,10 @@ private:
 
 class once_flag {
 public:
-    constexpr once_flag() noexcept {}
+    constexpr once_flag() noexcept = default;
 
-private:
-    template<class F, class... Args>
-    friend void call_once(F&&, Args&&...);
+    once_flag(once_flag const&) = delete;
+    once_flag& operator=(once_flag const&) = delete;
     
     std::atomic<bool> flag_{false};
 };
