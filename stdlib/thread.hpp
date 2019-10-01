@@ -63,8 +63,9 @@ public:
     }
 
     ~thread() {
-        if (joinable())
-            std::terminate();
+        SYNC_ASSERT(!joinable(), "thread destructor called with out being joined");
+        //if (joinable())
+            //std::terminate();
     }
 
     // Observers
