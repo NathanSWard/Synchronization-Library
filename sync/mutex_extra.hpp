@@ -3,8 +3,8 @@
 
 #include "event.hpp"
 #include "semaphore.hpp"
-#include "stdlib/internal/sync_mutex.hpp"
-#include "stdlib/thread.hpp"
+#include "../stdlib/internal/sync_mutex.hpp"
+#include "../stdlib/thread.hpp"
 
 #include <atomic>
 #include <limits>

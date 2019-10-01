@@ -41,7 +41,7 @@ public:
             cv_.wait(lock, [this]{return count_ == threads_;});
     }
 
-    // does not block until all threads have arrived at the barrier.
+    // does not block
     void arrive_and_drop() {
         unique_lock lock{mtx_};
         if (--count_ == 0) {
@@ -86,7 +86,7 @@ public:
 #ifndef DISABLE_SYNC_ASSERT
     ~flex_barrier() {
         scoped_lock lock{mtx_};
-        SYNC_ASSERT(count_ == threads_, "Treads are still waiting on a flex_barrier");
+        SYNC_ASSERT(count_ == threads_, "Threads are still waiting on a flex_barrier");
     }
 #else
 #endif
@@ -103,7 +103,7 @@ public:
             cv_.wait(lock, [this]{return count_ == threads_;});
     }
 
-    // does not block until all threads have arrived at the barrier.
+    // does not block
     void arrive_and_drop() {
         unique_lock lock{mtx_};
         if (--count_ == 0) {

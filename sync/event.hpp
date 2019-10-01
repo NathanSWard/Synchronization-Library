@@ -1,8 +1,8 @@
 // event.hpp
 #pragma once
 
-#include "stdlib/condition_variable.hpp"
-#include "stdlib/mutex.hpp"
+#include "../stdlib/condition_variable.hpp"
+#include "../stdlib/mutex.hpp"
 
 namespace sync {
 

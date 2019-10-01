@@ -1,7 +1,7 @@
 // barrier_extra.hpp
 #pragma once
 
-#include "stdlib/internal/sync_barrier.hpp"
+#include "../stdlib/internal/sync_barrier.hpp"
 
 #include <functional>
 

@@ -86,12 +86,12 @@ public:
 
     // Operations
     void join() {
-        SYNC_ASSERT(!joinable(), "thread::join, trying to join an unjoinable thread");
+        SYNC_ASSERT(joinable(), "thread::join, trying to join an unjoinable thread");
         sync_thread_join(handle_);
     }
 
     void detach() {
-        SYNC_ASSERT(!joinable(), "thread::join, trying to detach an unjoinable thread");
+        SYNC_ASSERT(joinable(), "thread::join, trying to detach an unjoinable thread");
         sync_thread_detach(handle_);
     }
 
