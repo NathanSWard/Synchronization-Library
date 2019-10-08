@@ -49,7 +49,7 @@ namespace sync {
         InitializeSRWLock(&mtx)
     }
 
-    void sync_rwlock_destroy(sync_rwlock_t&) {}
+    constexpr void sync_rwlock_destroy(sync_rwlock_t&) noexcept {}
 
     void sync_rwlock_wrlock(sync_rwlock_t& mtx) {
         AcquireSRWLockExclusive(&mtx);
@@ -75,7 +75,7 @@ namespace sync {
         ReleaseSRWLockShared(&mtx);
     }
 
-#elif SYNC_MAX || SYNC_LINUX 
+#elif SYNC_MAC || SYNC_LINUX 
     
     // basic mutex
     void sync_mutex_init(sync_mutex_t& mtx) {

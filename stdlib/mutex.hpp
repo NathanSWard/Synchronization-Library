@@ -200,7 +200,7 @@ int try_lock(M0& m0, M1& m1) {
     unique_lock lock{m0, try_to_lock};
     if (lock.owns_lock()) {
         if (m1.try_lock()) {
-            m0.release();
+            lock.release();
             return -1;
         }
         else

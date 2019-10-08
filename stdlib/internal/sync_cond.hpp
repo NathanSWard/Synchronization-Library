@@ -58,7 +58,7 @@ void sync_cond_broadcast(sync_cond_t&);
         WakeAllConditionVariable(&cv);
     }
 
-#elif SYNC_MAX || SYNC_LINUX
+#elif SYNC_MAC || SYNC_LINUX
 
     void sync_cond_init(sync_cond_t& cv) {
         SYNC_POSIX_ASSERT(pthread_cond_init(&cv, nullptr), "pthread_cond_init failed");
