@@ -1,139 +1,97 @@
 // thread.hpp
 #pragma once
 
-#include "internal/sync_thread.hpp"
+#include "_thread.hpp"
+#include "stop_token.hpp"
 
-#include <exception>
 #include <functional>
-#include <memory>
-#include <tuple>
 #include <utility>
-
-// helper namespace for thead::thread construction with function args
-namespace {
-    template<class T>
-    std::decay_t<T> decay_copy(T&& t) {
-        return std::forward<T>(t);
-    }
-    
-    template<class Fp, class... Args, std::size_t ...Is>
-    inline void call_void_callable(std::tuple<Fp, Args...>& tup, std::index_sequence<Is...>) {
-        std::invoke(std::move(std::get<Is>(tup))...); 
-    }
-
-    template<class T>
-    void* void_callable(void* args) {
-        std::unique_ptr<T> ptr{static_cast<T*>(args)};
-        using idx = std::make_index_sequence<std::tuple_size_v<T>>;
-        call_void_callable(*ptr, idx{});
-        return nullptr;
-    }
-}
 
 namespace sync {
 
-class thread {
+class jthread { // class for self-joining threads
 public:
-    using native_handle_type = sync_thread_t;
-    using id = sync_thread_id_t;
+    using id = thread::id;
+    using native_handle_type = thread::native_handle_type;
 
-    // Member functions
-    thread() noexcept = default;
+    jthread() noexcept 
+        : stop_source_{nostopstate}
+        , thread_{} 
+    {}
 
-    thread(thread&& other) noexcept 
-        : handle_{other.handle_}
-    {
-        other.handle_ = SYNC_NULL_THREAD;
+    template <class Fn, class... Args, std::enable_if_t<!std::is_same_v<std::remove_cv_t<std::remove_reference_t<Fn>>, jthread>, int> = 0>
+    explicit jthread(Fn&& fn, Args&&... args)
+        : stop_source_{}
+        , thread_{[](auto&& fn2, stop_token token, auto&&... args2) {
+                        if constexpr (std::is_invocable_v<Fn, stop_token, Args...>)
+                            std::invoke(std::forward<decltype(fn2)>(fn2), std::move(token), std::forward<decltype(args2)>(args2)...); 
+                        else
+                            std::invoke(std::forward<decltype(fn2)>(fn2), std::forward<decltype(args2)>(args2)...);
+                    },
+                    std::forward<Fn>(fn), stop_source_.get_token(), std::forward<Args>(args)...} 
+    {}
+
+    ~jthread() noexcept {
+        if (joinable()) {
+            request_stop();
+            join();
+        }
     }
 
-    thread& operator=(thread&& other) noexcept {
-        if (joinable())
-            std::terminate();
-        handle_ = std::exchange(other.handle_, SYNC_NULL_THREAD);
-        return *this;
-    }
+    jthread(jthread&& _Other) noexcept = default;
+    jthread& operator=(jthread&& _Other) noexcept = default;
 
-    template <class Fn, class ...Args>
-    explicit thread(Fn&& f, Args&&... args) {
-        using Tup = std::tuple<std::decay_t<Fn>, std::decay_t<Args>...>;  
-        std::unique_ptr<Tup> ptr{
-            std::make_unique<Tup>(decay_copy(std::forward<Fn>(f)), 
-                                  decay_copy(std::forward<Args>(args))...)};
-        sync_thread_create(handle_, &void_callable<Tup>, static_cast<void*>(ptr.release()));
-    }
+    jthread(const jthread&) = delete;
+    jthread& operator=(const jthread&) = delete;
 
-    ~thread() {
-        SYNC_ASSERT(!joinable(), "thread destructor called with out being joined");
-        //if (joinable())
-            //std::terminate();
-    }
-
-    // Observers
-    bool joinable() const noexcept {
-        return !sync_thread_is_null(handle_);
-    }
-
-    id get_id() const noexcept {
-        return sync_thread_id(handle_);
-    }
-
-    native_handle_type native_handle() {
-        return handle_;
-    }
-
-    static unsigned int hardward_concurrency() noexcept {
-        return sync_thread_getconcurrency();
-    } 
-
-    // Operations
-    void join() {
-        SYNC_ASSERT(joinable(), "thread::join, trying to join an unjoinable thread");
-        sync_thread_join(handle_);
+    void swap(jthread& _Other) noexcept {
+        thread_.swap(_Other.thread_);
+        stop_source_.swap(_Other.stop_source_);
     }
 
     void detach() {
-        SYNC_ASSERT(joinable(), "thread::join, trying to detach an unjoinable thread");
-        sync_thread_detach(handle_);
+        thread_.detach();
     }
 
-    void swap(thread& other) noexcept {
-        std::swap(handle_, other.handle_);
+    id get_id() const noexcept {
+        return thread_.get_id();
+    }
+
+    static auto hardware_concurrency() noexcept {
+        return thread::hardware_concurrency();
+    }
+
+    void join() {
+        thread_.join();
+    }
+
+    bool joinable() const noexcept {
+        return thread_.joinable();
+    }
+
+    native_handle_type native_handle() {
+        return thread_.native_handle();
+    }
+
+    [[nodiscard]] stop_source get_stop_source() noexcept {
+        return stop_source_;
+    }
+
+    [[nodiscard]] stop_token get_stop_token() const noexcept {
+        return stop_source_.get_token();
+    }
+
+    bool request_stop() noexcept {
+        return stop_source_.request_stop();
     }
 
 private:
-    native_handle_type  handle_{SYNC_NULL_THREAD};
+    stop_source stop_source_;
+    thread thread_;
 };
 
-inline void swap(thread& x, thread& y) noexcept {
-    x.swap(y);
+inline void swap(jthread& lhs, jthread& rhs) noexcept {
+    lhs.swap(rhs);
 }
-
-namespace this_thread {
-    void yield() noexcept {
-        sync_thread_yield();
-    }
-
-    thread::id get_id() noexcept {
-        return sync_thread_curr_id();
-    }
-
-    template<class Rep, class Period>
-    void sleep_for(std::chrono::duration<Rep, Period> const& sleep_duration) {
-        sync_thread_sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(sleep_duration));
-    }
-
-    template<class Clock, class Duration>
-    void sleep_until(std::chrono::time_point<Clock, Duration> const& sleep_time) {
-        sync_thread_sleep_for(sleep_time - Clock::now());
-    }
-}
-
-/*
-TODO:
-class stop_token;
-class stop_source;
-class stop_callback
-class jthread;
-*/
 
 } // namespace sync

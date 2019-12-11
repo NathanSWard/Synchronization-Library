@@ -24,7 +24,7 @@ inline void _sync_assert(bool b, std::string_view msg) {
 
 #define SYNC_ASSERT(b, msg) _sync_assert(b, msg);
 
-    #ifdef SYNC_MAC || SYNC_LINUX
+    #if SYNC_MAC || SYNC_LINUX
 
     #define SYNC_POSIX_ASSERT(fn, msg) _sync_assert(fn == 0, msg)
 
