@@ -25,9 +25,8 @@ public:
 #ifndef DISABLE_SYNC_ASSERT
     ~barrier() {
         scoped_lock lock{mtx_};
-        SYNC_ASSERT(count_ == threads_, "Treads are still waiting on a barrier");
+        SYNC_ASSERT(count_ == threads_, "Threads are still waiting on a barrier");
     }
-#else
 #endif
 
     void arrive_and_wait() {
@@ -88,7 +87,6 @@ public:
         scoped_lock lock{mtx_};
         SYNC_ASSERT(count_ == threads_, "Threads are still waiting on a flex_barrier");
     }
-#else
 #endif
 
     void arrive_and_wait() {
@@ -122,7 +120,6 @@ private:
     mutex                           mtx_;
     std::ptrdiff_t                  count_;
     std::ptrdiff_t                  threads_;
-
 };
 
 }
